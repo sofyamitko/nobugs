@@ -281,6 +281,16 @@ Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
   "name": "Kate"
 }
 
+### Негативный: Пользователь не может поменять имя в профиле, если поле состоит из пробелов (пустое)
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": " "
+}
+
 ### Негативный: Пользователь не может поменять имя в профиле, если оно включает цифру
 ### Katya1958 / Avndj313!
 PUT http://localhost:4111/api/v1/customer/profile
