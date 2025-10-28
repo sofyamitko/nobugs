@@ -343,3 +343,33 @@ Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
 {
   "name": "Kate , Katya"
 }
+
+### Негативный: Пользователь не может поменять имя в профиле, если оно разделено 2мя и > пробелами
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": "Kate  Katya"
+}
+
+### Негативный: Пользователь не может поменять имя в профиле, если после второго слова присуствует пробел
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": "Kate Katya "
+}
+
+### Негативный: Пользователь не может поменять имя в профиле, если перед первым словом присуствует пробел
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": " Kate Katya"
+}
