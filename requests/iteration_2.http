@@ -213,7 +213,7 @@ Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
   "amount": -1
 }
 
-### Негативный кейс: Пользователь не может перевести сумму денег 10000.1 на другой свой аккаунт
+### Негативный кейс: Пользователь не может перевести сумму денег 10000.01 на другой свой аккаунт
 ### Katya1958 / Avndj313!
 POST http://localhost:4111/api/v1/accounts/transfer
 Content-Type: application/json
@@ -222,10 +222,10 @@ Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
 {
   "senderAccountId": 9,
   "receiverAccountId": 10,
-  "amount": 10000.1
+  "amount": 10000.01
 }
 
-### Негативный кейс: Пользователь не может перевести сумму денег 10000.1 на чужой аккаунт
+### Негативный кейс: Пользователь не может перевести сумму денег 10000.01 на чужой аккаунт
 ### Katya1958 / Avndj313!
 POST http://localhost:4111/api/v1/accounts/transfer
 Content-Type: application/json
@@ -234,7 +234,7 @@ Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
 {
   "senderAccountId": 10,
   "receiverAccountId": 12,
-  "amount": 10000.1
+  "amount": 10000.01
 }
 
 ### Негативный кейс: Пользователь не может перевести сумму денег, превышающую баланс, на другой свой аккаунт
