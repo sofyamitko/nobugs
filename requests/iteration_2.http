@@ -1,0 +1,375 @@
+### Вспомогательный метод - авторизация пользователя для получения токена
+POST http://localhost:4111/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "Sasha137",
+  "password": "fHWj313!"
+}
+
+### Вспомогательный метод - создание нового пользователя
+POST http://localhost:4111/api/v1/admin/users
+Content-Type: application/json
+Authorization: Basic YWRtaW46YWRtaW4=
+
+{
+  "username": "Katya1958",
+  "password": "Avndj313!",
+  "role": "USER"
+}
+
+### Вспомогательный метод - создание аккаунта у пользователя
+POST http://localhost:4111/api/v1/accounts
+Content-Type: application/json
+Authorization: Basic U2FzaGExMzc6ZkhXajMxMyE=
+
+### Вспомогательный метод - получение аккаунтов у пользователя
+### Id Аккаунтов Katya1958: 9, 10, 11
+### Id Аккаунтов Sasha137: 12, 13
+GET http://localhost:4111/api/v1/customer/accounts
+Content-Type: application/json
+Authorization: Basic U2FzaGExMzc6ZkhXajMxMyE=
+
+### Вспомогательный метод - получение профиля пользователя
+### Katya1958 / Avndj313!
+### Sasha137 / fHWj313!
+GET http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+
+
+
+### Позитивный кейс: Пользователь может пополнить баланс существующего счета на 0.01
+### Katya1958/Avndj313!
+POST http://localhost:4111/api/v1/accounts/deposit
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "id": 9,
+  "balance": 0.01
+}
+
+### Позитивный кейс: Пользователь может пополнить баланс существующего счета на 5000
+### Katya1958/Avndj313!
+POST http://localhost:4111/api/v1/accounts/deposit
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "id": 10,
+  "balance": 5000
+}
+
+### Негативный кейс: Пользователь не может пополнить баланс существующего счета на 0.0
+### Katya1958/Avndj313!
+POST http://localhost:4111/api/v1/accounts/deposit
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "id": 10,
+  "balance": 0.0
+}
+
+### Негативный кейс: Пользователь не может пополнить баланс существующего счета на 5000.01
+### Katya1958/Avndj313!
+POST http://localhost:4111/api/v1/accounts/deposit
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "id": 10,
+  "balance": 5000.01
+}
+
+### Негативный кейс: Пользователь не может пополнить баланс существующего счета на отрицательную сумму
+### Katya1958/Avndj313!
+POST http://localhost:4111/api/v1/accounts/deposit
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "id": 10,
+  "balance": -1
+}
+
+### Негативный кейс: Пользователь не может пополнить баланс НЕ существующего счета
+### Katya1958/Avndj313!
+POST http://localhost:4111/api/v1/accounts/deposit
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "id": 27479173,
+  "balance": 1
+}
+
+### Негативный кейс: Пользователь не может пополнить баланс счета чужого пользователя (Sasha137 - ID 12)
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/deposit
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "id": 12,
+  "balance": 1
+}
+
+### Положительный кейс: Пользователь может перевести сумму денег 0.01 на другой свой аккаунт
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/transfer
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "senderAccountId": 9,
+  "receiverAccountId": 12,
+  "amount": 0.01
+}
+
+### Положительный кейс: Пользователь может перевести сумму денег 0.01 на чужой аккаунт
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/transfer
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "senderAccountId": 10,
+  "receiverAccountId": 12,
+  "amount": 0.01
+}
+
+### Положительный кейс: Пользователь может перевести сумму денег 10000 на другой свой аккаунт
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/transfer
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "senderAccountId": 10,
+  "receiverAccountId": 9,
+  "amount": 10000
+}
+
+### Положительный кейс: Пользователь может перевести сумму денег 10000 на чужой аккаунт
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/transfer
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "senderAccountId": 9,
+  "receiverAccountId": 12,
+  "amount": 10000
+}
+
+### Негативный кейс: Пользователь не может перевести сумму денег 0 на другой свой аккаунт
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/transfer
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "senderAccountId": 10,
+  "receiverAccountId": 9,
+  "amount": 0
+}
+
+### Негативный кейс: Пользователь не может перевести сумму денег 0 на чужой аккаунт
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/transfer
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "senderAccountId": 11,
+  "receiverAccountId": 12,
+  "amount": 0
+}
+
+### Негативный кейс: Пользователь не может перевести сумму денег -1 на другой свой аккаунт
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/transfer
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "senderAccountId": 10,
+  "receiverAccountId": 9,
+  "amount": -1
+}
+
+### Негативный кейс: Пользователь не может перевести сумму денег -1 на чужой аккаунт
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/transfer
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "senderAccountId": 11,
+  "receiverAccountId": 12,
+  "amount": -1
+}
+
+### Негативный кейс: Пользователь не может перевести сумму денег 10000.01 на другой свой аккаунт
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/transfer
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "senderAccountId": 9,
+  "receiverAccountId": 10,
+  "amount": 10000.01
+}
+
+### Негативный кейс: Пользователь не может перевести сумму денег 10000.01 на чужой аккаунт
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/transfer
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "senderAccountId": 10,
+  "receiverAccountId": 12,
+  "amount": 10000.01
+}
+
+### Негативный кейс: Пользователь не может перевести сумму денег, превышающую баланс, на другой свой аккаунт
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/transfer
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "senderAccountId": 11,
+  "receiverAccountId": 9,
+  "amount": 1
+}
+
+### Негативный кейс: Пользователь не может перевести сумму денег, превышающую баланс, на чужой аккаунт
+### Katya1958 / Avndj313!
+POST http://localhost:4111/api/v1/accounts/transfer
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "senderAccountId": 9,
+  "receiverAccountId": 12,
+  "amount": 1
+}
+
+### Позитивный: Пользователь может поменять имя профиля
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": "Kate KATYA"
+}
+
+### Негативный: Пользователь не может поменять имя в профиле, если оно включает 1 слово
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": "Kate"
+}
+
+### Негативный: Пользователь не может поменять имя в профиле, если поле состоит из пробелов (пустое)
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": " "
+}
+
+### Негативный: Пользователь не может поменять имя в профиле, если оно включает цифру
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": "Kate Katya1"
+}
+
+### Негативный: Пользователь не может поменять имя в профиле, если оно включает спец символ !
+### Для более полного покрытия можно проверить на нескольких спец символах
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": "Kate Katya!"
+}
+
+### Негативный: Пользователь не может поменять имя в профиле, если оно включает спец символ *
+### Для более полного покрытия можно проверить на нескольких спец символах
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": "Kate Katya*"
+}
+
+### Негативный: Пользователь не может поменять имя в профиле, если оно включает спец символ :)
+### Для более полного покрытия можно проверить на нескольких спец символах
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": "Kate Katya:)"
+}
+
+### Негативный: Пользователь не может поменять имя в профиле, если оно разделено пробелом и запятой
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": "Kate , Katya"
+}
+
+### Негативный: Пользователь не может поменять имя в профиле, если оно разделено 2мя и > пробелами
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": "Kate  Katya"
+}
+
+### Негативный: Пользователь не может поменять имя в профиле, если после второго слова присуствует пробел
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": "Kate Katya "
+}
+
+### Негативный: Пользователь не может поменять имя в профиле, если перед первым словом присуствует пробел
+### Katya1958 / Avndj313!
+PUT http://localhost:4111/api/v1/customer/profile
+Content-Type: application/json
+Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
+
+{
+  "name": " Kate Katya"
+}
