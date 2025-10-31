@@ -127,7 +127,7 @@ public class DepositMoneyTest {
                 .assertThat()
                 .body("balance", Matchers.equalTo((float) amount));
 
-        // проверка, что у пользователя по данному аккаунту актуальный баланс
+        // проверка через GET запрос, что баланс пользователя увеличился на сумму депозита
         double actualBalance = getAccountOfUser(tokenAuth, accountId);
         Assertions.assertEquals(amount, actualBalance);
     }
@@ -167,7 +167,7 @@ public class DepositMoneyTest {
                 .then()
                 .statusCode(200);
 
-        // проверка, что у пользователя по данному аккаунту актуальный баланс
+        // проверка через GET запрос, что баланс пользователя увеличился на сумму депозита дважды
         double actualBalance = getAccountOfUser(tokenAuth, accountId);
         Assertions.assertEquals(amount+amount, actualBalance);
     }
@@ -201,7 +201,7 @@ public class DepositMoneyTest {
                 .assertThat()
                 .body(Matchers.equalTo(errorMessage));
 
-        // проверка, что у пользователя по данному аккаунту баланс равен 0, тк баланс не пополнен
+        // проверка через GET запрос, что баланс пользователя НЕ изменился на сумму депозита из-за некорректной суммы
         double actualBalance = getAccountOfUser(tokenAuth, accountId);
         Assertions.assertEquals(0.0, actualBalance);
     }
@@ -209,10 +209,13 @@ public class DepositMoneyTest {
 
     @Test
     public void userCanNotIncreaseDepositOfAnotherAccountByValidAmount(){
+
+        //создание дополнительного пользователя с аккаунтом
         String username = createUsername();
         String anotherTokenAuth = createUserAndReturnToken(username, "Password33!");
         int anotherAccountId = createAccount(anotherTokenAuth);
 
+        //попытка пополнить первым пользователем баланс счета второго пользователя
         given()
                 .contentType(ContentType.JSON)
                 .accept(ContentType.JSON)
@@ -229,9 +232,14 @@ public class DepositMoneyTest {
                 .assertThat()
                 .body(Matchers.equalTo("Unauthorized access to account"));
 
-        // проверка, что у пользователя по данному аккаунту баланс равен 0, тк баланс не был пополнен
-        double actualBalance = getAccountOfUser(anotherTokenAuth, anotherAccountId);
-        Assertions.assertEquals(0.0, actualBalance);
+        // проверка через GET запрос, что чужой баланс счета НЕ изменен при пополнении его другим пользователем
+        double actualBalanceOfAnotherAccount = getAccountOfUser(anotherTokenAuth, anotherAccountId);
+        Assertions.assertEquals(0.0, actualBalanceOfAnotherAccount);
+
+        // проверка через GET запрос, что баланс счета пользователя, осуществляющего депозит,
+        // НЕ изменен, тк указан чужой id счета
+        double actualBalanceOfAccount = getAccountOfUser(tokenAuth, accountId);
+        Assertions.assertEquals(0.0, actualBalanceOfAccount);
     }
 
     @Test
@@ -252,5 +260,10 @@ public class DepositMoneyTest {
                 .statusCode(403)
                 .assertThat()
                 .body(Matchers.equalTo("Unauthorized access to account"));
+
+        // проверка через GET запрос, что баланс счета пользователя, осуществляющего депозит,
+        // НЕ изменен, тк указан несуществующий id счета
+        double actualBalance = getAccountOfUser(tokenAuth, accountId);
+        Assertions.assertEquals(0.0, actualBalance);
     }
 }
