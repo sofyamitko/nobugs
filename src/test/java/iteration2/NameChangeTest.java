@@ -72,6 +72,7 @@ public class NameChangeTest {
                 .header("Authorization");
     }
 
+    //служебный метод, возвращающий актуальный name у пользователя по токену
     public String getNameUser(String token) {
         return given()
                 .contentType(ContentType.JSON)
@@ -104,6 +105,7 @@ public class NameChangeTest {
                 .body("customer.username", Matchers.equalTo(this.username))
                 .body("customer.name", Matchers.equalTo(name));
 
+        // проверка через GET запрос, что name пользователя изменен
         String currentName = getNameUser(tokenAuth);
         Assertions.assertEquals(name, currentName);
     }
@@ -141,6 +143,7 @@ public class NameChangeTest {
                 .assertThat()
                 .body(Matchers.equalTo("Name must contain two words with letters only"));
 
+        // проверка через GET запрос, что name пользователя НЕ изменен
         String currentName = getNameUser(tokenAuth);
         Assertions.assertNull( currentName);
     }
