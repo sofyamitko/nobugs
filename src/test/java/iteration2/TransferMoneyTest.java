@@ -1,274 +1,125 @@
 package iteration2;
 
-import io.restassured.RestAssured;
-import io.restassured.filter.log.RequestLoggingFilter;
-import io.restassured.filter.log.ResponseLoggingFilter;
-import io.restassured.http.ContentType;
-import org.hamcrest.Matchers;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
+import iteration1.BaseTest;
+import models.accounts.AccountTransactionModel;
+import models.accounts.TransferMoneyRequestModel;
+import models.accounts.TransferMoneyResponseModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import java.util.UUID;
+import requests.TransferMoneyRequester;
+import specs.RequestSpecs;
+import specs.ResponseSpecs;
+import utils.AssertionsUtils;
+import utils.factory.TestUserContext;
+
 import java.util.stream.Stream;
 
-import static io.restassured.RestAssured.given;
 
-public class TransferMoneyTest {
-
-    private int firstAccountId;
-    private int secondAccountId;
-
-    private String tokenAuth;
-    private final double MAX_AMOUNT_FOR_DEPOSIT = 5000.00;
-
-    private final String baseUrl = "http://localhost:4111/api/v1";
-    private static final String ADMIN_AUTH = "Basic YWRtaW46YWRtaW4=";
-
-    @BeforeAll
-    public static void setup() {
-        RestAssured.filters(new RequestLoggingFilter(), new ResponseLoggingFilter());
-    }
-
-    // перед каждым тестом создается новый пользователь, возвращается его токен
-    // у пользователя создается 2 аккаунта, 1ый аккаунт пополнен на 10.000
-    @BeforeEach
-    public void createAccountsOfUser() {
-        String firstUsername = createUsername();
-
-        tokenAuth = createUserAndReturnToken(firstUsername, "Password33!");
-
-        firstAccountId = createAccount(tokenAuth);
-        secondAccountId = createAccount(tokenAuth);
-
-        increaseBalanceOfAccount(tokenAuth, firstAccountId, MAX_AMOUNT_FOR_DEPOSIT);
-        increaseBalanceOfAccount(tokenAuth, firstAccountId, MAX_AMOUNT_FOR_DEPOSIT);
-    }
-
-    // служебный метод для создания неповторяющегося username для пользователя
-    public String createUsername() {
-        return "katya" + UUID.randomUUID().toString().substring(0, 4);
-    }
-
-    // служебный метод для создания нового пользователя и возврата его токена
-    public String createUserAndReturnToken(String username, String password) {
-
-
-        String requestBody = String.format(
-                """ 
-                               {
-                                "username": "%s",
-                                "password": "%s",
-                                "role": "USER"
-                               }
-                        """, username, password);
-
-
-        given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", ADMIN_AUTH)
-                .body(requestBody)
-                .post(baseUrl + "/admin/users")
-                .then()
-                .statusCode(201);
-
-        return given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", ADMIN_AUTH)
-                .body(requestBody)
-                .post(baseUrl + "/auth/login")
-                .then()
-                .statusCode(200)
-                .extract()
-                .header("Authorization");
-    }
-
-    //служебный метод для создания аккаунта у пользователя и возврата id аккаунта
-    public int createAccount(String token) {
-        return given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", token)
-                .post(baseUrl + "/accounts")
-                .then()
-                .statusCode(201)
-                .extract()
-                .body().jsonPath().getInt("id");
-    }
-
-    // служебный метод для получения баланса у конкретного аккаунта пользователя
-    public double getAccountOfUser(String token, int id) {
-        return given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", token)
-                .get(baseUrl + "/customer/accounts")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath()
-                .getDouble("find {it.id == " + id + "}.balance");
-    }
-
-    // служебный метод для пополнения баланса аккаунта
-    public void increaseBalanceOfAccount(String token, int id, double amount) {
-        given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", token)
-                .body(String.format("""
-                        {
-                          "id": %s,
-                          "balance": %s
-                        }
-                        """, id, amount))
-                .post(baseUrl + "/accounts/deposit")
-                .then()
-                .statusCode(200);
-    }
+public class TransferMoneyTest extends BaseTest {
 
     @ParameterizedTest
     @ValueSource(doubles = {0.01, 10000.00})
     public void userCanTransferValidAmountBetweenOwnAccounts(double amount) {
 
-        //получение актуального баланса первого счета перед переводом
-        double balanceOfFirstAccountBeforeTransfer = getAccountOfUser(tokenAuth, firstAccountId);
+        TestUserContext testUser = factory.createUserWithAccounts();
 
-        given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", tokenAuth)
-                .body(String.format("""
-                        {
-                           "senderAccountId": %s,
-                           "receiverAccountId": %s,
-                           "amount": %s
-                         }
-                        """, firstAccountId, secondAccountId, amount))
-                .post(baseUrl + "/accounts/transfer")
-                .then()
-                .statusCode(200)
-                .assertThat()
-                .body("amount", Matchers.equalTo((float) amount))
-                .body("receiverAccountId", Matchers.equalTo(secondAccountId))
-                .body("senderAccountId", Matchers.equalTo(firstAccountId))
-                .body("message", Matchers.equalTo("Transfer successful"));
+        //увеличение баланса первого аккаунта
+        accountBalanceUtils.depositAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId(), 15000);
 
-        //проверка через GET запрос, что баланс ВТОРОГО аккаунта увеличился на сумму amount
-        double actualBalanceOfSecondAccount = getAccountOfUser(tokenAuth, secondAccountId);
-        Assertions.assertEquals(amount, actualBalanceOfSecondAccount);
+        //получение баланса по аккаунтам до перевода
+        double balanceFirstAccountBeforeTransfer = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
+        double balanceSecondAccountBeforeTransfer = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getSecondAccountId());
 
-        //проверка через GET запрос, что баланс ПЕРВОГО аккаунта уменьшился на сумму amount
-        double actualBalanceOfFirstAccount = getAccountOfUser(tokenAuth, firstAccountId);
-        Assertions.assertEquals(balanceOfFirstAccountBeforeTransfer - amount, actualBalanceOfFirstAccount);
-    }
+        TransferMoneyRequestModel transferMoneyRequest = TransferMoneyRequestModel
+                .builder()
+                .senderAccountId(testUser.getFirstAccountId())
+                .receiverAccountId(testUser.getSecondAccountId())
+                .amount(amount)
+                .build();
 
-    @ParameterizedTest
-    @ValueSource(doubles = {0.01, 5000})
-    public void userCanTransferValidAmountBetweenOwnAccountsSeveralTimes(double amount) {
+        TransferMoneyResponseModel transferMoneyResponse = new TransferMoneyRequester(
+                RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
+                ResponseSpecs.requestReturnsOkSpec())
+                .post(transferMoneyRequest)
+                .extract()
+                .as(TransferMoneyResponseModel.class);
 
-        //получение актуального баланса первого счета перед переводом
-        double balanceOfFirstAccountBeforeTransfer = getAccountOfUser(tokenAuth, firstAccountId);
+        //проверка тела ответа
+        AssertionsUtils.assertSuccessfulTransfer(softly, transferMoneyResponse, amount, testUser.getFirstAccountId(), testUser.getSecondAccountId());
 
-        given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", tokenAuth)
-                .body(String.format("""
-                        {
-                           "senderAccountId": %s,
-                           "receiverAccountId": %s,
-                           "amount": %s
-                         }
-                        """, firstAccountId, secondAccountId, amount))
-                .post(baseUrl + "/accounts/transfer")
-                .then()
-                .statusCode(200)
-                .assertThat()
-                .body("amount", Matchers.equalTo((float) amount))
-                .body("receiverAccountId", Matchers.equalTo(secondAccountId))
-                .body("senderAccountId", Matchers.equalTo(firstAccountId))
-                .body("message", Matchers.equalTo("Transfer successful"));
+        //проверка наличия транзакций по переводу на аккаунтах
+        AccountTransactionModel transactionFirstAccount = accountBalanceUtils.getTransactionsOfIdAccount(testUser.getUsername(), testUser.getPassword(),
+                testUser.getFirstAccountId(), amount, testUser.getSecondAccountId());
+        AssertionsUtils.assertTransaction(softly, transactionFirstAccount,"TRANSFER_OUT");
 
-        given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", tokenAuth)
-                .body(String.format("""
-                        {
-                           "senderAccountId": %s,
-                           "receiverAccountId": %s,
-                           "amount": %s
-                         }
-                        """, firstAccountId, secondAccountId, amount))
-                .post(baseUrl + "/accounts/transfer")
-                .then()
-                .statusCode(200)
-                .assertThat()
-                .body("amount", Matchers.equalTo((float) amount))
-                .body("receiverAccountId", Matchers.equalTo(secondAccountId))
-                .body("senderAccountId", Matchers.equalTo(firstAccountId))
-                .body("message", Matchers.equalTo("Transfer successful"));
+        AccountTransactionModel transactionSecondAccount = accountBalanceUtils.getTransactionsOfIdAccount(testUser.getUsername(), testUser.getPassword(),
+                testUser.getSecondAccountId(), amount, testUser.getFirstAccountId());
+        AssertionsUtils.assertTransaction(softly, transactionSecondAccount,"TRANSFER_IN");
 
+        //получение баланса по аккаунтам после перевода
+        double balanceFirstAccountAfterTransfer = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(),
+                testUser.getFirstAccountId());
+        double balanceSecondAccountAfterTransfer = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(),
+                testUser.getSecondAccountId());
 
-        //проверка через GET запрос, что баланс ВТОРОГО аккаунта увеличился на сумму amount дважды
-        double actualBalanceOfSecondAccount = getAccountOfUser(tokenAuth, secondAccountId);
-        Assertions.assertEquals(amount + amount, actualBalanceOfSecondAccount);
-
-        //проверка через GET запрос, что баланс ПЕРВОГО аккаунта уменьшился на сумму amount дважды
-        double actualBalanceOfFirstAccount = getAccountOfUser(tokenAuth, firstAccountId);
-        Assertions.assertEquals(balanceOfFirstAccountBeforeTransfer - amount - amount, actualBalanceOfFirstAccount);
+        //проверка изменения состояния баланса по аккаунтам
+        AssertionsUtils.assertBalancesUpdatedAfterTransfer(softly, balanceFirstAccountBeforeTransfer,
+                balanceSecondAccountBeforeTransfer, balanceFirstAccountAfterTransfer, balanceSecondAccountAfterTransfer, amount);
     }
 
     @ParameterizedTest
     @ValueSource(doubles = {0.01, 10000.00})
     public void userCanTransferValidAmountToAnotherUsersAccount(double amount) {
 
-        //получение актуального баланса первого счета перед переводом
-        double balanceOfFirstAccountBeforeTransfer = getAccountOfUser(tokenAuth, firstAccountId);
+        TestUserContext testUser1 = factory.createUserWithAccounts();
+        TestUserContext testUser2 = factory.createUserWithAccounts();
 
-        //создание второго пользователя с аккаунтом
-        String anotherUsername = createUsername();
-        String anotherToken = createUserAndReturnToken(anotherUsername, "Password33!");
-        int anotherAccount = createAccount(anotherToken);
+        //увеличение баланса аккаунта первого юзера
+        accountBalanceUtils.depositAccount(testUser1.getUsername(), testUser1.getPassword(), testUser1.getFirstAccountId(), 15000);
 
-        //перевод суммы amount со счета ПЕРВОГО пользователя на счет ВТОРОГО пользователя
-        given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", tokenAuth)
-                .body(String.format("""
-                        {
-                           "senderAccountId": %s,
-                           "receiverAccountId": %s,
-                           "amount": %s
-                         }
-                        """, firstAccountId, anotherAccount, amount))
-                .post(baseUrl + "/accounts/transfer")
-                .then()
-                .statusCode(200)
-                .assertThat()
-                .body("amount", Matchers.equalTo((float) amount))
-                .body("receiverAccountId", Matchers.equalTo(anotherAccount))
-                .body("senderAccountId", Matchers.equalTo(firstAccountId))
-                .body("message", Matchers.equalTo("Transfer successful"));
+        //получение баланса по аккаунтам до перевода
+        double balanceAccountOfFirstUserBeforeTransfer = accountBalanceUtils.getBalanceOfAccount(testUser1.getUsername(), testUser1.getPassword(), testUser1.getFirstAccountId());
+        double balanceAccountOfSecondUserBeforeTransfer = accountBalanceUtils.getBalanceOfAccount(testUser2.getUsername(), testUser2.getPassword(), testUser2.getFirstAccountId());
 
-        //проверка через GET запрос, что баланс аккаунта ВТОРОГО пользователя увеличился на сумму amount
-        double actualBalanceOfAnotherAccount = getAccountOfUser(anotherToken, anotherAccount);
-        Assertions.assertEquals(amount, actualBalanceOfAnotherAccount);
+        TransferMoneyRequestModel transferMoneyRequest = TransferMoneyRequestModel
+                .builder()
+                .senderAccountId(testUser1.getFirstAccountId())
+                .receiverAccountId(testUser2.getFirstAccountId())
+                .amount(amount)
+                .build();
 
-        //проверка через GET запрос, что баланс аккаунта ПЕРВОГО пользователя уменьшился на сумму amount
-        double actualBalanceOfFirstAccount = getAccountOfUser(tokenAuth, firstAccountId);
-        Assertions.assertEquals(balanceOfFirstAccountBeforeTransfer - amount, actualBalanceOfFirstAccount);
+        TransferMoneyResponseModel transferMoneyResponse = new TransferMoneyRequester(
+                RequestSpecs.authAsUserSpec(testUser1.getUsername(), testUser1.getPassword()),
+                ResponseSpecs.requestReturnsOkSpec())
+                .post(transferMoneyRequest)
+                .extract()
+                .as(TransferMoneyResponseModel.class);
+
+        //проверка тела ответа
+        AssertionsUtils.assertSuccessfulTransfer(softly, transferMoneyResponse, amount, testUser1.getFirstAccountId(), testUser2.getFirstAccountId());
+
+        //проверка наличия транзакций по переводу на аккаунтах
+        AccountTransactionModel transactionFirstAccount = accountBalanceUtils.getTransactionsOfIdAccount(testUser1.getUsername(),
+                testUser1.getPassword(), testUser1.getFirstAccountId(), amount, testUser2.getFirstAccountId());
+        AssertionsUtils.assertTransaction(softly, transactionFirstAccount,"TRANSFER_OUT");
+
+        AccountTransactionModel transactionSecondAccount = accountBalanceUtils.getTransactionsOfIdAccount(testUser2.getUsername(),
+                testUser2.getPassword(), testUser2.getFirstAccountId(), amount, testUser1.getFirstAccountId());
+        AssertionsUtils.assertTransaction(softly, transactionSecondAccount,"TRANSFER_IN");
+
+        //получение баланса по аккаунтам после перевода
+        double balanceAccountOfFirstUserAfterTransfer = accountBalanceUtils.getBalanceOfAccount(testUser1.getUsername(),
+                testUser1.getPassword(), testUser1.getFirstAccountId());
+        double balanceAccountOfSecondUserAfterTransfer = accountBalanceUtils.getBalanceOfAccount(testUser2.getUsername(),
+                testUser2.getPassword(), testUser2.getFirstAccountId());
+
+        //проверка изменения состояния баланса по аккаунтам
+        AssertionsUtils.assertBalancesUpdatedAfterTransfer(softly, balanceAccountOfFirstUserBeforeTransfer,
+                balanceAccountOfSecondUserBeforeTransfer, balanceAccountOfFirstUserAfterTransfer, balanceAccountOfSecondUserAfterTransfer, amount);
     }
-
 
     public static Stream<Arguments> invalidAmountForTransfer() {
         return Stream.of(
@@ -282,36 +133,36 @@ public class TransferMoneyTest {
     @MethodSource("invalidAmountForTransfer")
     public void userCanNotTransferInvalidAmountBetweenOwnAccounts(double amount, String errorMessage) {
 
-        increaseBalanceOfAccount(tokenAuth, firstAccountId, MAX_AMOUNT_FOR_DEPOSIT);
+        TestUserContext testUser = factory.createUserWithAccounts();
 
-        // получение актуального состояния баланса первого и второго аккаунтов у пользователя
-        double balanceOfFirstAccountBeforeTransfer = getAccountOfUser(tokenAuth, firstAccountId);
-        double balanceOfSecondAccountBeforeTransfer = getAccountOfUser(tokenAuth, secondAccountId);
+        //увеличение баланса первого аккаунта
+        accountBalanceUtils.depositAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId(), 15000);
 
-        given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", tokenAuth)
-                .body(String.format("""
-                        {
-                           "senderAccountId": %s,
-                           "receiverAccountId": %s,
-                           "amount": %s
-                         }
-                        """, firstAccountId, secondAccountId, amount))
-                .post(baseUrl + "/accounts/transfer")
-                .then()
-                .statusCode(400)
-                .assertThat()
-                .body(Matchers.equalTo(errorMessage));
+        //получение баланса по аккаунтам до перевода
+        double balanceFirstAccountBeforeTransfer = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
+        double balanceSecondAccountBeforeTransfer = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getSecondAccountId());
 
-        //проверка через GET запрос, что баланс ВТОРОГО аккаунта пользователя не изменился после перевода
-        double actualBalanceOfSecondAccount = getAccountOfUser(tokenAuth, secondAccountId);
-        Assertions.assertEquals(balanceOfSecondAccountBeforeTransfer, actualBalanceOfSecondAccount);
+        TransferMoneyRequestModel transferMoneyRequest = TransferMoneyRequestModel
+                .builder()
+                .senderAccountId(testUser.getFirstAccountId())
+                .receiverAccountId(testUser.getSecondAccountId())
+                .amount(amount)
+                .build();
 
-        //проверка через GET запрос, что баланс ПЕРВОГО аккаунта пользователя не изменился после перевода
-        double actualBalanceOfFirstAccount = getAccountOfUser(tokenAuth, firstAccountId);
-        Assertions.assertEquals(balanceOfFirstAccountBeforeTransfer, actualBalanceOfFirstAccount);
+        new TransferMoneyRequester(
+                RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
+                ResponseSpecs.requestReturnsBadRequestSpec(errorMessage))
+                .post(transferMoneyRequest);
+
+        //получение баланса по аккаунтам после перевода
+        double balanceFirstAccountAfterTransfer = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(),
+                testUser.getPassword(), testUser.getFirstAccountId());
+        double balanceSecondAccountAfterTransfer = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(),
+                testUser.getPassword(), testUser.getSecondAccountId());
+
+        //проверка отсутствия изменения состояния баланса по аккаунтам
+        AssertionsUtils.assertBalancesUnchangedAfterTransfer(softly, balanceFirstAccountBeforeTransfer, balanceSecondAccountBeforeTransfer,
+                balanceFirstAccountAfterTransfer, balanceSecondAccountAfterTransfer);
     }
 
     public static Stream<Arguments> invalidAmountForTransferToAnotherAccount() {
@@ -326,110 +177,103 @@ public class TransferMoneyTest {
     @MethodSource("invalidAmountForTransferToAnotherAccount")
     public void userCanNotTransferInvalidAmountToAnotherUsersAccount(double amount, String errorMessage) {
 
-        //дополнительное увеличение баланса аккаунта у первого пользователя на MAX_AMOUNT_FOR_DEPOSIT
-        increaseBalanceOfAccount(tokenAuth, firstAccountId, MAX_AMOUNT_FOR_DEPOSIT);
-        double balanceOfFirstAccountBeforeTransfer = getAccountOfUser(tokenAuth, firstAccountId);
+        TestUserContext testUser1 = factory.createUserWithAccounts();
+        TestUserContext testUser2 = factory.createUserWithAccounts();
 
-        //создание второго пользователя с аккаунтом
-        String anotherUsername = createUsername();
-        String anotherToken = createUserAndReturnToken(anotherUsername, "Password33!");
-        int anotherAccount = createAccount(anotherToken);
-        double balanceOfAnotherAccountBeforeTransfer = getAccountOfUser(anotherToken, anotherAccount);
+        //увеличение баланса аккаунта первого юзера
+        accountBalanceUtils.depositAccount(testUser1.getUsername(), testUser1.getPassword(), testUser1.getFirstAccountId(), 5000);
 
-        given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", tokenAuth)
-                .body(String.format("""
-                        {
-                           "senderAccountId": %s,
-                           "receiverAccountId": %s,
-                           "amount": %s
-                         }
-                        """, firstAccountId, anotherAccount, amount))
-                .post(baseUrl + "/accounts/transfer")
-                .then()
-                .statusCode(400)
-                .assertThat()
-                .body(Matchers.equalTo(errorMessage));
+        //получение баланса по аккаунтам до перевода
+        double balanceAccountOfFirstUserBeforeTransfer = accountBalanceUtils.getBalanceOfAccount(testUser1.getUsername(), testUser1.getPassword(), testUser1.getFirstAccountId());
+        double balanceAccountOfSecondUserBeforeTransfer = accountBalanceUtils.getBalanceOfAccount(testUser2.getUsername(), testUser2.getPassword(), testUser2.getFirstAccountId());
 
-        //проверка через GET запрос, что баланс аккаунта ВТОРОГО пользователя не изменился после перевода
-        double actualBalanceOfAnotherAccount = getAccountOfUser(anotherToken, anotherAccount);
-        Assertions.assertEquals(balanceOfAnotherAccountBeforeTransfer, actualBalanceOfAnotherAccount);
+        TransferMoneyRequestModel transferMoneyRequest = TransferMoneyRequestModel
+                .builder()
+                .senderAccountId(testUser1.getFirstAccountId())
+                .receiverAccountId(testUser2.getFirstAccountId())
+                .amount(amount)
+                .build();
 
-        //проверка через GET запрос, что баланс аккаунта ПЕРВОГО пользователя не изменился после перевода
-        double actualBalanceOfFirstAccount = getAccountOfUser(tokenAuth, firstAccountId);
-        Assertions.assertEquals(balanceOfFirstAccountBeforeTransfer, actualBalanceOfFirstAccount);
+        new TransferMoneyRequester(
+                RequestSpecs.authAsUserSpec(testUser1.getUsername(), testUser1.getPassword()),
+                ResponseSpecs.requestReturnsBadRequestSpec(errorMessage))
+                .post(transferMoneyRequest);
+
+        //получение баланса по аккаунтам после перевода
+        double balanceAccountOfFirstUserAfterTransfer = accountBalanceUtils.getBalanceOfAccount(testUser1.getUsername(),
+                testUser1.getPassword(), testUser1.getFirstAccountId());
+        double balanceAccountOfSecondUserAfterTransfer = accountBalanceUtils.getBalanceOfAccount(testUser2.getUsername(),
+                testUser2.getPassword(), testUser2.getFirstAccountId());
+
+        //проверка отсутствия изменения состояния баланса по аккаунтам
+        AssertionsUtils.assertBalancesUnchangedAfterTransfer(softly, balanceAccountOfFirstUserBeforeTransfer, balanceAccountOfSecondUserBeforeTransfer,
+                balanceAccountOfFirstUserAfterTransfer, balanceAccountOfSecondUserAfterTransfer);
     }
 
     @Test
     public void userCanNotTransferAmountExceedingBalanceBetweenOwnAccounts() {
 
-        //получение актуального состояния баланса первого и второго аккаунта у пользователя
-        double balanceOfFirstAccountBeforeTransfer = getAccountOfUser(tokenAuth, firstAccountId);
-        double balanceOfSecondAccountBeforeTransfer = getAccountOfUser(tokenAuth, secondAccountId);
+        TestUserContext testUser = factory.createUserWithAccounts();
 
-        given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", tokenAuth)
-                .body(String.format("""
-                        {
-                           "senderAccountId": %s,
-                           "receiverAccountId": %s,
-                           "amount": 1
-                         }
-                        """, secondAccountId, firstAccountId))
-                .post(baseUrl + "/accounts/transfer")
-                .then()
-                .statusCode(400)
-                .assertThat()
-                .body(Matchers.equalTo("Invalid transfer: insufficient funds or invalid accounts"));
+        //получение баланса по аккаунтам до перевода
+        //предварительное пополнение баланса отсутствует
+        double balanceFirstAccountBeforeTransfer = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
+        double balanceSecondAccountBeforeTransfer = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getSecondAccountId());
 
-        //проверка через GET запрос, что баланс ВТОРОГО аккаунта пользователя не изменился после перевода
-        double actualBalanceOfSecondAccount = getAccountOfUser(tokenAuth, secondAccountId);
-        Assertions.assertEquals(balanceOfSecondAccountBeforeTransfer, actualBalanceOfSecondAccount);
+        TransferMoneyRequestModel transferMoneyRequest = TransferMoneyRequestModel
+                .builder()
+                .senderAccountId(testUser.getFirstAccountId())
+                .receiverAccountId(testUser.getSecondAccountId())
+                .amount(1.0)
+                .build();
 
-        //проверка через GET запрос, что баланс ПЕРВОГО аккаунта пользователя не изменился после перевода
-        double actualBalanceOfFirstAccount = getAccountOfUser(tokenAuth, firstAccountId);
-        Assertions.assertEquals(balanceOfFirstAccountBeforeTransfer, actualBalanceOfFirstAccount);
+        new TransferMoneyRequester(
+                RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
+                ResponseSpecs.requestReturnsBadRequestSpec("Invalid transfer: insufficient funds or invalid accounts"))
+                .post(transferMoneyRequest);
+
+        //получение баланса по аккаунтам после перевода
+        double balanceFirstAccountAfterTransfer = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(),
+                testUser.getPassword(), testUser.getFirstAccountId());
+        double balanceSecondAccountAfterTransfer = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(),
+                testUser.getPassword(), testUser.getSecondAccountId());
+
+        //проверка отсутствия изменения состояния баланса по аккаунтам
+        AssertionsUtils.assertBalancesUnchangedAfterTransfer(softly, balanceFirstAccountBeforeTransfer, balanceSecondAccountBeforeTransfer,
+                balanceFirstAccountAfterTransfer, balanceSecondAccountAfterTransfer);
     }
 
     @Test
     public void userCanNotTransferAmountExceedingBalanceToAnotherUsersAccount() {
 
-        //получение актуального состояния баланса  второго аккаунта у ПЕРВОГО пользователя
-        double balanceOfSecondAccountBeforeTransfer = getAccountOfUser(tokenAuth, secondAccountId);
+        TestUserContext testUser1 = factory.createUserWithAccounts();
+        TestUserContext testUser2 = factory.createUserWithAccounts();
 
-        //создание ВТОРОГО пользователя с аккаунтом
-        String anotherUsername = createUsername();
-        String anotherToken = createUserAndReturnToken(anotherUsername, "Password33!");
-        int anotherAccount = createAccount(anotherToken);
-        double balanceOfAnotherAccountBeforeTransfer = getAccountOfUser(anotherToken, anotherAccount);
+        //получение баланса по аккаунтам до перевода
+        //предварительное пополнение баланса отсутствует
+        double balanceAccountOfFirstUserBeforeTransfer = accountBalanceUtils.getBalanceOfAccount(testUser1.getUsername(), testUser1.getPassword(), testUser1.getFirstAccountId());
+        double balanceAccountOfSecondUserBeforeTransfer = accountBalanceUtils.getBalanceOfAccount(testUser2.getUsername(), testUser2.getPassword(), testUser2.getFirstAccountId());
 
-        given()
-                .contentType(ContentType.JSON)
-                .accept(ContentType.JSON)
-                .header("Authorization", tokenAuth)
-                .body(String.format("""
-                        {
-                           "senderAccountId": %s,
-                           "receiverAccountId": %s,
-                           "amount": 1
-                         }
-                        """, secondAccountId, anotherAccount))
-                .post(baseUrl + "/accounts/transfer")
-                .then()
-                .statusCode(400)
-                .assertThat()
-                .body(Matchers.equalTo("Invalid transfer: insufficient funds or invalid accounts"));
+        TransferMoneyRequestModel transferMoneyRequest = TransferMoneyRequestModel
+                .builder()
+                .senderAccountId(testUser1.getFirstAccountId())
+                .receiverAccountId(testUser2.getFirstAccountId())
+                .amount(1.0)
+                .build();
 
-        //проверка через GET запрос, что баланс аккаунта ВТОРОГО пользователя не изменился после перевода
-        double actualBalanceOfAnotherAccount = getAccountOfUser(anotherToken, anotherAccount);
-        Assertions.assertEquals(balanceOfAnotherAccountBeforeTransfer, actualBalanceOfAnotherAccount);
+        new TransferMoneyRequester(
+                RequestSpecs.authAsUserSpec(testUser1.getUsername(), testUser1.getPassword()),
+                ResponseSpecs.requestReturnsBadRequestSpec("Invalid transfer: insufficient funds or invalid accounts"))
+                .post(transferMoneyRequest);
 
-        //проверка через GET запрос, что баланс аккаунта ПЕРВОГО пользователя не изменился после перевода
-        double actualBalanceOfSecondAccount = getAccountOfUser(tokenAuth, secondAccountId);
-        Assertions.assertEquals(balanceOfSecondAccountBeforeTransfer, actualBalanceOfSecondAccount);
+        //получение баланса по аккаунтам после перевода
+        double balanceAccountOfFirstUserAfterTransfer = accountBalanceUtils.getBalanceOfAccount(testUser1.getUsername(),
+                testUser1.getPassword(), testUser1.getFirstAccountId());
+        double balanceAccountOfSecondUserAfterTransfer = accountBalanceUtils.getBalanceOfAccount(testUser2.getUsername(),
+                testUser2.getPassword(), testUser2.getFirstAccountId());
+
+        //проверка отсутствия изменения состояния баланса по аккаунтам
+        AssertionsUtils.assertBalancesUnchangedAfterTransfer(softly, balanceAccountOfFirstUserBeforeTransfer, balanceAccountOfSecondUserBeforeTransfer,
+                balanceAccountOfFirstUserAfterTransfer, balanceAccountOfSecondUserAfterTransfer);
     }
 }
