@@ -1,92 +1,178 @@
 package iteration2;
 
-import iteration1.BaseTest;
-import models.accounts.AccountRequestModel;
-import models.accounts.AccountResponseModel;
+import io.restassured.RestAssured;
+import io.restassured.filter.log.RequestLoggingFilter;
+import io.restassured.filter.log.ResponseLoggingFilter;
+import io.restassured.http.ContentType;
+import org.hamcrest.Matchers;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import requests.DepositAccountRequester;
-import specs.RequestSpecs;
-import specs.ResponseSpecs;
-import utils.AssertionsUtils;
-import utils.factory.TestUserContext;
 
+import java.util.UUID;
 import java.util.stream.Stream;
 
+import static io.restassured.RestAssured.given;
 
-public class DepositMoneyTest extends BaseTest {
+public class DepositMoneyTest {
+
+    private int accountId;
+    private String tokenAuth;
+
+    private final String baseUrl = "http://localhost:4111/api/v1";
+    private static final String ADMIN_AUTH = "Basic YWRtaW46YWRtaW4=";
+
+    @BeforeAll
+    public static void setup(){
+         RestAssured.filters(new RequestLoggingFilter(), new ResponseLoggingFilter());
+    }
+
+    // перед каждым тестом создается новый пользователь, возвращается его токен и создается по нему аккаунт
+    @BeforeEach
+    public void createAccountOfUser(){
+        String username = createUsername();
+        tokenAuth = createUserAndReturnToken(username, "Password33!");
+        accountId = createAccount(tokenAuth);
+    }
+
+    // служебный метод для создания неповторяющегося username для пользователя
+    public String createUsername(){
+        return "katya" + UUID.randomUUID().toString().substring(0, 4);
+    }
+
+    // служебный метод для создания нового пользователя и возврата его токена
+    public String createUserAndReturnToken(String username, String password){
+
+
+        String requestBody = String.format(
+                """ 
+                               {
+                                "username": "%s",
+                                "password": "%s",
+                                "role": "USER"
+                               }
+                        """, username, password);
+
+
+        given()
+                .contentType(ContentType.JSON)
+                .accept(ContentType.JSON)
+                .header("Authorization", ADMIN_AUTH)
+                .body(requestBody)
+                .post(baseUrl + "/admin/users")
+                .then()
+                .statusCode(201);
+
+       return given()
+                .contentType(ContentType.JSON)
+                .accept(ContentType.JSON)
+                .header("Authorization", ADMIN_AUTH)
+                .body(requestBody)
+                .post(baseUrl + "/auth/login")
+                .then()
+                .statusCode(200)
+                .extract()
+                .header("Authorization");
+    }
+
+    //служебный метод для создания аккаунта у пользователя
+    public int createAccount(String token){
+       return given()
+                .contentType(ContentType.JSON)
+                .accept(ContentType.JSON)
+                .header("Authorization", token)
+                .post(baseUrl + "/accounts")
+                .then()
+                .statusCode(201)
+                .extract()
+                .body().jsonPath().getInt("id");
+    }
+
+    // служебный метод для получения баланса у конкретного аккаунта пользователя
+    public double getAccountOfUser(String token, int id){
+      return given()
+                .contentType(ContentType.JSON)
+                .accept(ContentType.JSON)
+                .header("Authorization", token)
+                .get(baseUrl + "/customer/accounts")
+                .then()
+                .statusCode(200)
+                .extract()
+                .body()
+                .jsonPath()
+                .getDouble("find {it.id == " + id + "}.balance");
+    }
 
     @ParameterizedTest
     @ValueSource(doubles = {0.01, 5000})
-    public void userCanIncreaseDepositOfExistingAccount(double amount) {
+    public void userCanIncreaseDepositOfExistingAccount(double amount){
+        given()
+                .contentType(ContentType.JSON)
+                .accept(ContentType.JSON)
+                .header("Authorization", tokenAuth)
+                .body(String.format("""
+                        {
+                          "id": %s,
+                          "balance": %s
+                        }
+                        """, accountId, amount))
+                .post(baseUrl + "/accounts/deposit")
+                .then()
+                .statusCode(200)
+                .assertThat()
+                .body("balance", Matchers.equalTo((float) amount));
 
-        TestUserContext testUser = factory.createUserWithAccounts();
-
-        // получение баланса аккаунта до депозита
-        double balanceBeforeDeposit = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
-
-        AccountRequestModel accountRequest = AccountRequestModel.builder()
-                .id(testUser.getFirstAccountId())
-                .balance(amount)
-                .build();
-
-        // пополнение аккаунта на сумму депозита
-        AccountResponseModel accountRequestModelAfterDeposit = new DepositAccountRequester(
-                RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
-                ResponseSpecs.requestReturnsOkSpec())
-                .post(accountRequest)
-                .extract().as(AccountResponseModel.class);
-
-        //проверка тела ответа
-        AssertionsUtils.assertSuccessfulDeposit(softly, accountRequestModelAfterDeposit, amount);
-
-        // получение баланса после депозита
-        double balanceAfterDeposit = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
-
-        //проверка изменения состояния баланса
-        AssertionsUtils.assertBalancesUpdatedAfterDeposit(softly, balanceBeforeDeposit, balanceAfterDeposit, amount);
+        // проверка через GET запрос, что баланс пользователя увеличился на сумму депозита
+        double actualBalance = getAccountOfUser(tokenAuth, accountId);
+        Assertions.assertEquals(amount, actualBalance);
     }
 
-    public static Stream<Arguments> validAmountForSeveralDeposit() {
-
-        return Stream.of(
-                Arguments.of(0.01, 2),
-                Arguments.of(5000, 3)
-        );
-    }
 
     @ParameterizedTest
-    @MethodSource("validAmountForSeveralDeposit")
-    public void userCanIncreaseDepositOfExistingAccountSeveralTimes(double amount, int times) {
+    @ValueSource(doubles = {0.01, 5000})
+    public void userCanIncreaseDepositOfExistingAccountSeveralTimes(double amount){
 
-        TestUserContext testUser = factory.createUserWithAccounts();
+        // 1ое увеличения баланса
+        given()
+                .contentType(ContentType.JSON)
+                .accept(ContentType.JSON)
+                .header("Authorization", tokenAuth)
+                .body(String.format("""
+                        {
+                          "id": %s,
+                          "balance": %s
+                        }
+                        """, accountId, amount))
+                .post(baseUrl + "/accounts/deposit")
+                .then()
+                .statusCode(200);
 
-        // получение баланса аккаунта до депозита
-        double balanceBeforeDeposit = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
+        // 2ое увеличение баланса
+        given()
+                .contentType(ContentType.JSON)
+                .accept(ContentType.JSON)
+                .header("Authorization", tokenAuth)
+                .body(String.format("""
+                        {
+                          "id": %s,
+                          "balance": %s
+                        }
+                        """, accountId, amount))
+                .post(baseUrl + "/accounts/deposit")
+                .then()
+                .statusCode(200);
 
-        AccountRequestModel accountRequest = AccountRequestModel.builder()
-                .id(testUser.getFirstAccountId())
-                .balance(amount)
-                .build();
-
-        // пополнение аккаунта на сумму депозита
-        for (int i = 0; i < times; i++) {
-            new DepositAccountRequester(
-                    RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
-                    ResponseSpecs.requestReturnsOkSpec())
-                    .post(accountRequest);
-        }
-
-        // получение баланса после депозита
-        double balanceAfterDeposit = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
-
-        //проверка изменения состояния баланса
-        AssertionsUtils.assertBalancesUpdatedAfterDepositSeveralTimes(softly, balanceBeforeDeposit, balanceAfterDeposit, amount, times);
+        // проверка через GET запрос, что баланс пользователя увеличился на сумму депозита дважды
+        double actualBalance = getAccountOfUser(tokenAuth, accountId);
+        Assertions.assertEquals(amount+amount, actualBalance);
     }
 
-    public static Stream<Arguments> invalidAmount() {
+    public static Stream<Arguments> invalidAmount(){
 
         return Stream.of(
                 Arguments.of(0.0, "Deposit amount must be at least 0.01"),
@@ -97,74 +183,87 @@ public class DepositMoneyTest extends BaseTest {
 
     @ParameterizedTest
     @MethodSource("invalidAmount")
-    public void userCanNotIncreaseDepositOfExistingAccountByInvalidAmount(double amount, String errorMessage) {
+    public void userCanNotIncreaseDepositOfExistingAccountByInvalidAmount(double amount, String errorMessage){
 
-        TestUserContext testUser = factory.createUserWithAccounts();
+        given()
+                .contentType(ContentType.JSON)
+                .accept(ContentType.JSON)
+                .header("Authorization", tokenAuth)
+                .body(String.format("""
+                        {
+                          "id": %s,
+                          "balance": %s
+                        }
+                        """, accountId, amount))
+                .post(baseUrl + "/accounts/deposit")
+                .then()
+                .statusCode(400)
+                .assertThat()
+                .body(Matchers.equalTo(errorMessage));
 
-        // получение баланса аккаунта до депозита
-        double balanceBeforeDeposit = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
-
-        AccountRequestModel accountRequest = AccountRequestModel.builder()
-                .id(testUser.getFirstAccountId())
-                .balance(amount)
-                .build();
-
-        // пополнение аккаунта на сумму депозита
-        new DepositAccountRequester(
-                RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
-                ResponseSpecs.requestReturnsBadRequestSpec(errorMessage))
-                .post(accountRequest);
-
-        // получение баланса после депозита
-        double balanceAfterDeposit = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
-
-        //проверка отсутствия измененения состояния баланса
-        AssertionsUtils.assertBalancesUnchangedAfterDeposit(softly, balanceBeforeDeposit, balanceAfterDeposit);
+        // проверка через GET запрос, что баланс пользователя НЕ изменился на сумму депозита из-за некорректной суммы
+        double actualBalance = getAccountOfUser(tokenAuth, accountId);
+        Assertions.assertEquals(0.0, actualBalance);
     }
 
-    @ParameterizedTest
-    @ValueSource(doubles = {0.01, 5000})
-    public void userCanNotIncreaseDepositOfAnotherAccountByValidAmount(double amount) {
 
-        TestUserContext testUser1 = factory.createUserWithAccount();
-        TestUserContext testUser2 = factory.createUserWithAccount();
+    @Test
+    public void userCanNotIncreaseDepositOfAnotherAccountByValidAmount(){
 
-        // получение баланса аккаунта до депозита
-        double balance2BeforeDeposit = accountBalanceUtils.getBalanceOfAccount(testUser2.getUsername(), testUser2.getPassword(), testUser2.getFirstAccountId());
+        //создание дополнительного пользователя с аккаунтом
+        String username = createUsername();
+        String anotherTokenAuth = createUserAndReturnToken(username, "Password33!");
+        int anotherAccountId = createAccount(anotherTokenAuth);
 
-        AccountRequestModel accountRequest = AccountRequestModel.builder()
-                .id(testUser2.getFirstAccountId())
-                .balance(amount)
-                .build();
+        //попытка пополнить первым пользователем баланс счета второго пользователя
+        given()
+                .contentType(ContentType.JSON)
+                .accept(ContentType.JSON)
+                .header("Authorization", tokenAuth)
+                .body(String.format("""
+                        {
+                          "id": %s,
+                          "balance": 50
+                        }
+                        """, anotherAccountId))
+                .post(baseUrl + "/accounts/deposit")
+                .then()
+                .statusCode(403)
+                .assertThat()
+                .body(Matchers.equalTo("Unauthorized access to account"));
 
-        // пополнение аккаунта на сумму депозита
-        new DepositAccountRequester(
-                RequestSpecs.authAsUserSpec(testUser1.getUsername(), testUser1.getPassword()),
-                ResponseSpecs.requestForbiddenSpec("Unauthorized access to account"))
-                .post(accountRequest);
+        // проверка через GET запрос, что чужой баланс счета НЕ изменен при пополнении его другим пользователем
+        double actualBalanceOfAnotherAccount = getAccountOfUser(anotherTokenAuth, anotherAccountId);
+        Assertions.assertEquals(0.0, actualBalanceOfAnotherAccount);
 
-        // получение баланса после депозита
-        double balance2AfterDeposit = accountBalanceUtils.getBalanceOfAccount(testUser2.getUsername(), testUser2.getPassword(), testUser2.getFirstAccountId());
-
-        //проверка отсутствия измененения состояния баланса
-        AssertionsUtils.assertBalancesUnchangedAfterDeposit(softly, balance2BeforeDeposit, balance2AfterDeposit);
+        // проверка через GET запрос, что баланс счета пользователя, осуществляющего депозит,
+        // НЕ изменен, тк указан чужой id счета
+        double actualBalanceOfAccount = getAccountOfUser(tokenAuth, accountId);
+        Assertions.assertEquals(0.0, actualBalanceOfAccount);
     }
 
-    @ParameterizedTest
-    @ValueSource(doubles = {0.01, 5000})
-    public void userCanNotIncreaseDepositOfNotExistingAccountByValidAmount(double amount) {
+    @Test
+    public void userCanNotIncreaseDepositOfNotExistingAccountByValidAmount(){
 
-        TestUserContext testUser = factory.createUserWithAccount();
+        given()
+                .contentType(ContentType.JSON)
+                .accept(ContentType.JSON)
+                .header("Authorization", tokenAuth)
+                .body("""
+                        {
+                          "id": 0,
+                          "balance": 50
+                        }
+                        """)
+                .post(baseUrl + "/accounts/deposit")
+                .then()
+                .statusCode(403)
+                .assertThat()
+                .body(Matchers.equalTo("Unauthorized access to account"));
 
-        AccountRequestModel accountRequest = AccountRequestModel.builder()
-                .id(0) //аккаунта с id = 0 не существует
-                .balance(amount)
-                .build();
-
-        // пополнение аккаунта на сумму депозита
-        new DepositAccountRequester(
-                RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
-                ResponseSpecs.requestForbiddenSpec("Unauthorized access to account"))
-                .post(accountRequest);
+        // проверка через GET запрос, что баланс счета пользователя, осуществляющего депозит,
+        // НЕ изменен, тк указан несуществующий id счета
+        double actualBalance = getAccountOfUser(tokenAuth, accountId);
+        Assertions.assertEquals(0.0, actualBalance);
     }
 }
