@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import models.BaseModel;
 import models.accounts.AccountResponseModel;
 
 import java.util.List;
@@ -12,7 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class GetUserProfileResponseModel {
+public class GetUserProfileResponseModel extends BaseModel {
     private Integer id;
     private String username;
     private String password;

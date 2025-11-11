@@ -1,14 +1,16 @@
 package iteration1;
 
-import generators.RandomData;
+import asserts.comparison.ModelAssertions;
+import generators.RandomModelGenerator;
 import models.admin.CreateUserRequestModel;
 import models.admin.CreateUserResponseModel;
-import models.UserRole;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import requests.AdminCreateUserRequester;
+import requests.skelethon.Endpoint;
+import requests.skelethon.requesters.CrudRequester;
+import requests.skelethon.requesters.ValidatedCrudRequester;
 import specs.RequestSpecs;
 import specs.ResponseSpecs;
 
@@ -16,34 +18,25 @@ import java.util.stream.Stream;
 
 public class CreateUserTest extends BaseTest {
 
-
     @Test
     public void adminCanCreateUserWithCorrectDate() {
 
-        CreateUserRequestModel createUserRequest = CreateUserRequestModel
-                .builder()
-                .username(RandomData.getUsername())
-                .password(RandomData.getPassword())
-                .role(UserRole.USER.toString())
-                .build();
+        CreateUserRequestModel createUserRequest = RandomModelGenerator.generate(CreateUserRequestModel.class);
 
-        CreateUserResponseModel createUserResponse = new AdminCreateUserRequester(RequestSpecs.adminSpec(),
-                ResponseSpecs.entityWasCreatedSpec())
-                .post(createUserRequest)
-                .extract().as(CreateUserResponseModel.class);
+        CreateUserResponseModel createUserResponse = new ValidatedCrudRequester<CreateUserResponseModel>
+                (RequestSpecs.adminSpec(),
+                        Endpoint.ADMIN_USER,
+                        ResponseSpecs.entityWasCreatedSpec())
+                .post(createUserRequest);
 
-        softly.assertThat(createUserRequest.getUsername()).isEqualTo(createUserResponse.getUsername());
-        softly.assertThat(createUserRequest.getPassword()).isNotEqualTo(createUserResponse.getPassword());
-        softly.assertThat(createUserRequest.getRole()).isEqualTo(createUserResponse.getRole());
-
-
+        ModelAssertions.assertThatModels(createUserRequest, createUserResponse).match();
     }
 
     public static Stream<Arguments> invalidDate() {
         return Stream.of(
-                Arguments.of(" ", "Password!3", "USER", "username",  new String[] {"Username must contain only letters, digits, dashes, underscores, and dots", "Username cannot be blank", "Username must be between 3 and 15 characters"}),
-                Arguments.of("as", "Password!3", "USER", "username", new String[] {"Username must be between 3 and 15 characters"}),
-                Arguments.of("as+!", "Password!3", "USER", "username", new String[] {"Username must contain only letters, digits, dashes, underscores, and dots"})
+                Arguments.of(" ", "Password!3", "USER", "username", new String[]{"Username must contain only letters, digits, dashes, underscores, and dots", "Username cannot be blank", "Username must be between 3 and 15 characters"}),
+                Arguments.of("as", "Password!3", "USER", "username", new String[]{"Username must be between 3 and 15 characters"}),
+                Arguments.of("as+!", "Password!3", "USER", "username", new String[]{"Username must contain only letters, digits, dashes, underscores, and dots"})
 
         );
     }
@@ -58,9 +51,9 @@ public class CreateUserTest extends BaseTest {
                 .role(role)
                 .build();
 
-        new AdminCreateUserRequester(RequestSpecs.adminSpec(),
+        new CrudRequester(RequestSpecs.adminSpec(),
+                Endpoint.ADMIN_USER,
                 ResponseSpecs.requestReturnsBadRequestSpec(errorkey, errorValue))
                 .post(createUserRequest);
-
     }
 }

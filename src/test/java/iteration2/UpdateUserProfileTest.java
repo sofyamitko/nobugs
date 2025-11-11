@@ -1,15 +1,19 @@
 package iteration2;
 
+import asserts.ProfileSnapshot;
+import asserts.comparison.ModelAssertions;
 import iteration1.BaseTest;
-import models.customer.GetUserProfileResponseModel;
+import models.admin.CreateUserRequestModel;
 import models.customer.UpdateUserProfileRequestModel;
 import models.customer.UpdateUserProfileResponseModel;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import requests.GetAndUpdateCustomerProfileRequester;
+import requests.skelethon.Endpoint;
+import requests.skelethon.requesters.CrudRequester;
+import requests.skelethon.requesters.ValidatedCrudRequester;
+import requests.steps.AdminSteps;
 import specs.RequestSpecs;
 import specs.ResponseSpecs;
-import utils.factory.TestUserContext;
 
 public class UpdateUserProfileTest extends BaseTest {
 
@@ -17,29 +21,28 @@ public class UpdateUserProfileTest extends BaseTest {
     @ValueSource(strings = {"Katya Katya", "KATYA KATYA", "Katya katya", "katya Katya", "d d"})
     public void userCanUpdateUserProfile(String name) {
 
-        TestUserContext testUser = factory.createUser();
+        CreateUserRequestModel user = AdminSteps.createUser();
+
+        // сохранение текущего состояния name до изменения
+        ProfileSnapshot snapshot = ProfileSnapshot.of(user.getUsername(), user.getPassword());
 
         // создание тела запроса на изменение имени пользователя
-        UpdateUserProfileRequestModel userProfileRequest =  UpdateUserProfileRequestModel
+        UpdateUserProfileRequestModel userProfileRequest = UpdateUserProfileRequestModel
                 .builder()
                 .name(name)
                 .build();
 
-        UpdateUserProfileResponseModel updateUserProfileResponse = new GetAndUpdateCustomerProfileRequester(
-                RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
+        UpdateUserProfileResponseModel userProfileResponse = new ValidatedCrudRequester<UpdateUserProfileResponseModel>(
+                RequestSpecs.authAsUserSpec(user.getUsername(), user.getPassword()),
+                Endpoint.UPDATE_PROFILE,
                 ResponseSpecs.requestReturnsOkSpec())
-                .put(userProfileRequest)
-                .extract()
-                .as(UpdateUserProfileResponseModel.class);
+                .update(userProfileRequest);
 
         //проверка тела ответа
-        softly.assertThat(updateUserProfileResponse.getMessage()).isEqualTo("Profile updated successfully");
-        softly.assertThat(updateUserProfileResponse.getCustomer().getUsername()).isEqualTo(testUser.getUsername());
-        softly.assertThat(updateUserProfileResponse.getCustomer().getName()).isEqualTo(name);
+        ModelAssertions.assertThatModels(userProfileRequest, userProfileResponse).match();
 
         //проверка изменения состояния через GET запрос профиля пользователя
-        GetUserProfileResponseModel getUserProfileResponse = userUtils.getUserProfile(testUser.getUsername(), testUser.getPassword());
-        softly.assertThat(getUserProfileResponse.getName()).isEqualTo(name);
+        snapshot.assertThat().isChanged(name);
     }
 
     @ParameterizedTest
@@ -61,21 +64,24 @@ public class UpdateUserProfileTest extends BaseTest {
 
     public void userCanNotUpdateUserProfile(String name) {
 
-        TestUserContext testUser = factory.createUser();
+        CreateUserRequestModel user = AdminSteps.createUser();
+
+        // сохранение текущего состояния name до изменения
+        ProfileSnapshot snapshot = ProfileSnapshot.of(user.getUsername(), user.getPassword());
 
         // создание тела запроса на изменение имени пользователя
-        UpdateUserProfileRequestModel userProfileRequest =  UpdateUserProfileRequestModel
+        UpdateUserProfileRequestModel userProfileRequest = UpdateUserProfileRequestModel
                 .builder()
                 .name(name)
                 .build();
 
-        new GetAndUpdateCustomerProfileRequester(
-                RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
+        new CrudRequester(
+                RequestSpecs.authAsUserSpec(user.getUsername(), user.getPassword()),
+                Endpoint.UPDATE_PROFILE,
                 ResponseSpecs.requestReturnsBadRequestSpec("Name must contain two words with letters only"))
-                .put(userProfileRequest);
+                .update(userProfileRequest);
 
-        //проверка изменения состояния через GET запрос профиля пользователя
-        GetUserProfileResponseModel getUserProfileResponse = userUtils.getUserProfile(testUser.getUsername(), testUser.getPassword());
-        softly.assertThat(getUserProfileResponse.getName()).isNull();
+        //проверка отсутствия изменения состояния через GET запрос профиля пользователя
+        snapshot.assertThat().isUnchanged();
     }
 }

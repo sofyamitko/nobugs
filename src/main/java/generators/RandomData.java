@@ -2,8 +2,6 @@ package generators;
 
 import org.apache.commons.lang3.RandomStringUtils;
 
-import java.util.Random;
-
 public class RandomData {
 
     //generators/ – генераторы случайных данных для тестов (RandomData).

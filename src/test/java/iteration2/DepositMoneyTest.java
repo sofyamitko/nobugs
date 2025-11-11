@@ -1,17 +1,22 @@
 package iteration2;
 
+import asserts.comparison.ModelAssertions;
 import iteration1.BaseTest;
 import models.accounts.AccountRequestModel;
 import models.accounts.AccountResponseModel;
+import models.admin.CreateUserRequestModel;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import requests.DepositAccountRequester;
+import requests.skelethon.Endpoint;
+import requests.skelethon.requesters.CrudRequester;
+import requests.skelethon.requesters.ValidatedCrudRequester;
+import requests.steps.AdminSteps;
+import requests.steps.UserSteps;
 import specs.RequestSpecs;
 import specs.ResponseSpecs;
-import utils.AssertionsUtils;
-import utils.factory.TestUserContext;
+import asserts.AccountBalanceSnapshot;
 
 import java.util.stream.Stream;
 
@@ -22,31 +27,29 @@ public class DepositMoneyTest extends BaseTest {
     @ValueSource(doubles = {0.01, 5000})
     public void userCanIncreaseDepositOfExistingAccount(double amount) {
 
-        TestUserContext testUser = factory.createUserWithAccounts();
+        CreateUserRequestModel user = AdminSteps.createUser();
+        AccountResponseModel account = UserSteps.createAccount(user);
 
-        // получение баланса аккаунта до депозита
-        double balanceBeforeDeposit = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
+        // создание снэпшота текущего состояния баланса (до выполнения депозита)
+        AccountBalanceSnapshot balance = AccountBalanceSnapshot.of(user.getUsername(), user.getPassword(), account.getId());
 
         AccountRequestModel accountRequest = AccountRequestModel.builder()
-                .id(testUser.getFirstAccountId())
+                .id(account.getId())
                 .balance(amount)
                 .build();
 
         // пополнение аккаунта на сумму депозита
-        AccountResponseModel accountRequestModelAfterDeposit = new DepositAccountRequester(
-                RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
+        AccountResponseModel accountResponseModelAfterDeposit = new ValidatedCrudRequester<AccountResponseModel>(
+                RequestSpecs.authAsUserSpec(user.getUsername(), user.getPassword()),
+                Endpoint.DEPOSIT,
                 ResponseSpecs.requestReturnsOkSpec())
-                .post(accountRequest)
-                .extract().as(AccountResponseModel.class);
+                .post(accountRequest);
 
         //проверка тела ответа
-        AssertionsUtils.assertSuccessfulDeposit(softly, accountRequestModelAfterDeposit, amount);
-
-        // получение баланса после депозита
-        double balanceAfterDeposit = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
+        ModelAssertions.assertThatModels(accountRequest, accountResponseModelAfterDeposit).match();
 
         //проверка изменения состояния баланса
-        AssertionsUtils.assertBalancesUpdatedAfterDeposit(softly, balanceBeforeDeposit, balanceAfterDeposit, amount);
+        balance.assertThat().isIncreasedBy(amount);
     }
 
     public static Stream<Arguments> validAmountForSeveralDeposit() {
@@ -61,29 +64,28 @@ public class DepositMoneyTest extends BaseTest {
     @MethodSource("validAmountForSeveralDeposit")
     public void userCanIncreaseDepositOfExistingAccountSeveralTimes(double amount, int times) {
 
-        TestUserContext testUser = factory.createUserWithAccounts();
+        CreateUserRequestModel user = AdminSteps.createUser();
+        AccountResponseModel account = UserSteps.createAccount(user);
 
-        // получение баланса аккаунта до депозита
-        double balanceBeforeDeposit = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
+        // создание снэпшота текущего состояния баланса (до выполнения депозита)
+        AccountBalanceSnapshot balance = AccountBalanceSnapshot.of(user.getUsername(), user.getPassword(), account.getId());
 
         AccountRequestModel accountRequest = AccountRequestModel.builder()
-                .id(testUser.getFirstAccountId())
+                .id(account.getId())
                 .balance(amount)
                 .build();
 
         // пополнение аккаунта на сумму депозита
         for (int i = 0; i < times; i++) {
-            new DepositAccountRequester(
-                    RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
+            new ValidatedCrudRequester<AccountResponseModel>(
+                    RequestSpecs.authAsUserSpec(user.getUsername(), user.getPassword()),
+                    Endpoint.DEPOSIT,
                     ResponseSpecs.requestReturnsOkSpec())
                     .post(accountRequest);
         }
 
-        // получение баланса после депозита
-        double balanceAfterDeposit = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
-
         //проверка изменения состояния баланса
-        AssertionsUtils.assertBalancesUpdatedAfterDepositSeveralTimes(softly, balanceBeforeDeposit, balanceAfterDeposit, amount, times);
+        balance.assertThat().isIncreasedSeveralTimesBy(amount, times);
     }
 
     public static Stream<Arguments> invalidAmount() {
@@ -99,62 +101,61 @@ public class DepositMoneyTest extends BaseTest {
     @MethodSource("invalidAmount")
     public void userCanNotIncreaseDepositOfExistingAccountByInvalidAmount(double amount, String errorMessage) {
 
-        TestUserContext testUser = factory.createUserWithAccounts();
+        CreateUserRequestModel user = AdminSteps.createUser();
+        AccountResponseModel account = UserSteps.createAccount(user);
 
-        // получение баланса аккаунта до депозита
-        double balanceBeforeDeposit = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
+        // создание снэпшота текущего состояния баланса (до выполнения депозита)
+        AccountBalanceSnapshot balance = AccountBalanceSnapshot.of(user.getUsername(), user.getPassword(), account.getId());
 
         AccountRequestModel accountRequest = AccountRequestModel.builder()
-                .id(testUser.getFirstAccountId())
+                .id(account.getId())
                 .balance(amount)
                 .build();
 
         // пополнение аккаунта на сумму депозита
-        new DepositAccountRequester(
-                RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
+        new CrudRequester(
+                RequestSpecs.authAsUserSpec(user.getUsername(), user.getPassword()),
+                Endpoint.DEPOSIT,
                 ResponseSpecs.requestReturnsBadRequestSpec(errorMessage))
                 .post(accountRequest);
 
-        // получение баланса после депозита
-        double balanceAfterDeposit = accountBalanceUtils.getBalanceOfAccount(testUser.getUsername(), testUser.getPassword(), testUser.getFirstAccountId());
-
         //проверка отсутствия измененения состояния баланса
-        AssertionsUtils.assertBalancesUnchangedAfterDeposit(softly, balanceBeforeDeposit, balanceAfterDeposit);
+        balance.assertThat().isUnchanged();
     }
+
 
     @ParameterizedTest
     @ValueSource(doubles = {0.01, 5000})
     public void userCanNotIncreaseDepositOfAnotherAccountByValidAmount(double amount) {
 
-        TestUserContext testUser1 = factory.createUserWithAccount();
-        TestUserContext testUser2 = factory.createUserWithAccount();
+        CreateUserRequestModel user1 = AdminSteps.createUser();
+        CreateUserRequestModel user2 = AdminSteps.createUser();
+        AccountResponseModel account2 = UserSteps.createAccount(user2);
 
-        // получение баланса аккаунта до депозита
-        double balance2BeforeDeposit = accountBalanceUtils.getBalanceOfAccount(testUser2.getUsername(), testUser2.getPassword(), testUser2.getFirstAccountId());
+        // создание снэпшота текущего состояния баланса (до выполнения депозита)
+        AccountBalanceSnapshot balance = AccountBalanceSnapshot.of(user2.getUsername(), user2.getPassword(), account2.getId());
 
         AccountRequestModel accountRequest = AccountRequestModel.builder()
-                .id(testUser2.getFirstAccountId())
+                .id(account2.getId())
                 .balance(amount)
                 .build();
 
         // пополнение аккаунта на сумму депозита
-        new DepositAccountRequester(
-                RequestSpecs.authAsUserSpec(testUser1.getUsername(), testUser1.getPassword()),
+        new CrudRequester(
+                RequestSpecs.authAsUserSpec(user1.getUsername(), user1.getPassword()),
+                Endpoint.DEPOSIT,
                 ResponseSpecs.requestForbiddenSpec("Unauthorized access to account"))
                 .post(accountRequest);
 
-        // получение баланса после депозита
-        double balance2AfterDeposit = accountBalanceUtils.getBalanceOfAccount(testUser2.getUsername(), testUser2.getPassword(), testUser2.getFirstAccountId());
-
         //проверка отсутствия измененения состояния баланса
-        AssertionsUtils.assertBalancesUnchangedAfterDeposit(softly, balance2BeforeDeposit, balance2AfterDeposit);
+        balance.assertThat().isUnchanged();
     }
 
     @ParameterizedTest
     @ValueSource(doubles = {0.01, 5000})
     public void userCanNotIncreaseDepositOfNotExistingAccountByValidAmount(double amount) {
 
-        TestUserContext testUser = factory.createUserWithAccount();
+        CreateUserRequestModel user = AdminSteps.createUser();
 
         AccountRequestModel accountRequest = AccountRequestModel.builder()
                 .id(0) //аккаунта с id = 0 не существует
@@ -162,8 +163,9 @@ public class DepositMoneyTest extends BaseTest {
                 .build();
 
         // пополнение аккаунта на сумму депозита
-        new DepositAccountRequester(
-                RequestSpecs.authAsUserSpec(testUser.getUsername(), testUser.getPassword()),
+        new CrudRequester(
+                RequestSpecs.authAsUserSpec(user.getUsername(), user.getPassword()),
+                Endpoint.DEPOSIT,
                 ResponseSpecs.requestForbiddenSpec("Unauthorized access to account"))
                 .post(accountRequest);
     }

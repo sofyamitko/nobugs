@@ -1,19 +1,19 @@
 package iteration1;
 
-import generators.RandomData;
 import models.admin.CreateUserRequestModel;
+import models.admin.CreateUserResponseModel;
 import models.authentication.LoginUserRequestModel;
-import models.UserRole;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
-import requests.AdminCreateUserRequester;
-import requests.LoginUserRequester;
+import requests.skelethon.Endpoint;
+import requests.skelethon.requesters.CrudRequester;
+import requests.skelethon.requesters.ValidatedCrudRequester;
+import requests.steps.AdminSteps;
 import specs.RequestSpecs;
 import specs.ResponseSpecs;
 
-import static io.restassured.RestAssured.given;
 
-public class LoginUserTest extends BaseTest{
+public class LoginUserTest extends BaseTest {
 
     @Test
     public void adminCanGenerateAuthTokenTest() {
@@ -23,8 +23,9 @@ public class LoginUserTest extends BaseTest{
                 .password("admin")
                 .build();
 
-        new LoginUserRequester(
+        new ValidatedCrudRequester<CreateUserResponseModel>(
                 RequestSpecs.unauthSpec(),
+                Endpoint.LOGIN,
                 ResponseSpecs.requestReturnsOkSpec())
                 .post(userRequest);
     }
@@ -32,23 +33,13 @@ public class LoginUserTest extends BaseTest{
     @Test
     public void userCanGenerateAuthTokenTest() {
 
-        CreateUserRequestModel userRequest = CreateUserRequestModel.builder()
-                .username(RandomData.getUsername())
-                .password(RandomData.getPassword())
-                .role(UserRole.USER.toString())
-                .build();
+        CreateUserRequestModel createUserRequest = AdminSteps.createUser();
 
-        new AdminCreateUserRequester(
-                RequestSpecs.adminSpec(),
-                ResponseSpecs.entityWasCreatedSpec())
-                .post(userRequest);
-
-
-        new LoginUserRequester(RequestSpecs.unauthSpec(), ResponseSpecs.requestReturnsOkSpec())
+        new CrudRequester(RequestSpecs.unauthSpec(), Endpoint.LOGIN, ResponseSpecs.requestReturnsOkSpec())
                 .post(LoginUserRequestModel
                         .builder()
-                        .username(userRequest.getUsername())
-                        .password(userRequest.getPassword())
+                        .username(createUserRequest.getUsername())
+                        .password(createUserRequest.getPassword())
                         .build())
                 .header("Authorization", Matchers.notNullValue());
     }
