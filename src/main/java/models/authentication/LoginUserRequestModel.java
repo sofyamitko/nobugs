@@ -12,7 +12,6 @@ import models.BaseModel;
 @Builder
 public class LoginUserRequestModel extends BaseModel {
     // models/ – классы данных для отправки и получения (POJOs).
-
     private String username;
     private String password;
 }

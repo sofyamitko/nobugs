@@ -4,12 +4,13 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import models.BaseModel;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class TransferMoneyResponseModel {
+public class TransferMoneyResponseModel extends BaseModel {
     private Integer receiverAccountId;
     private Double amount;
     private String message;
