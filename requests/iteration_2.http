@@ -13,11 +13,11 @@ Content-Type: application/json
 Authorization: Basic YWRtaW46YWRtaW4=
 
 {
-  "username": "Katya1958",
+  "username": "Katya132",
   "password": "Avndj313!",
   "role": "USER"
 }
-
+ACC128
 ### Вспомогательный метод - создание аккаунта у пользователя
 POST http://localhost:4111/api/v1/accounts
 Content-Type: application/json
@@ -47,7 +47,7 @@ Content-Type: application/json
 Authorization: Basic S2F0eWExOTU4OkF2bmRqMzEzIQ==
 
 {
-  "id": 9,
+  "id": 12,
   "balance": 0.01
 }
 
