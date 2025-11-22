@@ -1,9 +1,13 @@
 package ui.iteration2;
 
 import api.asserts.ProfileSnapshot;
+import api.generators.RandomData;
 import api.models.admin.CreateUserRequestModel;
 import api.requests.steps.AdminSteps;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import ui.iteration1.BaseUITest;
 import ui.pages.BankAlert;
 import ui.pages.EditProfilePage;
@@ -12,6 +16,8 @@ public class UpdateUserProfileTest extends BaseUITest {
 
     @Test
     public void userCanUpdateUserProfileTest() {
+        String name = RandomData.getName();
+
         CreateUserRequestModel user = AdminSteps.createUser();
 
         authAsUser(user);
@@ -20,18 +26,19 @@ public class UpdateUserProfileTest extends BaseUITest {
         ProfileSnapshot snapshot = ProfileSnapshot.of(user.getUsername(), user.getPassword());
 
         new EditProfilePage().open()
-                .enterName("Kata Katya")
+                .enterName(name)
                 .saveChanges()
                 .checkAlertMessageAndAccept(BankAlert.NAME_UPDATED_SUCCESSFULLY.getMessage())
-                .checkStateNameUser("Kata Katya");
+                .checkStateNameUser(name);
 
         //проверка изменения имени по API
-        snapshot.assertThat().isChanged("Kata Katya");
+        snapshot.assertThat().isChanged(name);
     }
 
     // Проверка валидации в связке с API - ошибка при изменении профиля с невалидным именем
-    @Test
-    public void userCanNotUpdateUserProfileWithInvalidNameTest() {
+    @ParameterizedTest
+    @ValueSource(strings = {"Kata   Katya Kat"})
+    public void userCanNotUpdateUserProfileWithInvalidNameTest(String name) {
         CreateUserRequestModel user = AdminSteps.createUser();
 
         authAsUser(user);
@@ -40,7 +47,7 @@ public class UpdateUserProfileTest extends BaseUITest {
         ProfileSnapshot snapshot = ProfileSnapshot.of(user.getUsername(), user.getPassword());
 
         new EditProfilePage().open()
-                .enterName("Kata   Katya Kat")
+                .enterName(name)
                 .saveChanges()
                 .checkAlertMessageAndAccept(BankAlert.NAME_MUST_CONTAIN_TWO_WORDS_WITH_LETTERS_ONLY.getMessage())
                 .checkStateNameUser("Noname");

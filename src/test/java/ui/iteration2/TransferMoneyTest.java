@@ -1,11 +1,14 @@
 package ui.iteration2;
 
 import api.asserts.AccountBalanceSnapshot;
+import api.generators.RandomData;
 import api.models.accounts.AccountResponseModel;
 import api.models.admin.CreateUserRequestModel;
 import api.requests.steps.AdminSteps;
 import api.requests.steps.UserSteps;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import ui.iteration1.BaseUITest;
 import ui.pages.BankAlert;
 import ui.pages.TransferPage;
@@ -14,7 +17,9 @@ public class TransferMoneyTest extends BaseUITest {
 
     @Test
     public void userCanTransferAmountBetweenOwnAccountsTest() {
-        //подготовка данных
+        // генерация валидного значения amount для перевода
+        double amount = RandomData.getAmount(0.10, 10000.00);
+
         CreateUserRequestModel user = AdminSteps.createUser();
 
         authAsUser(user);
@@ -28,11 +33,11 @@ public class TransferMoneyTest extends BaseUITest {
         AccountBalanceSnapshot balanceReceiverAccount = AccountBalanceSnapshot.of(user.getUsername(), user.getPassword(), account2.getId());
 
         //шаги теста
-        String expectedAlert = BankAlert.SUCCESSFULLY_TRANSFERRED.format(100.00, account2.getAccountNumber());
+        String expectedAlert = BankAlert.SUCCESSFULLY_TRANSFERRED.format(amount, account2.getAccountNumber());
         new TransferPage().open().selectSenderAccount(account1.getAccountNumber())
                 .enterRecipientName("Noname")
                 .enterRecipientAccountNumber(account2.getAccountNumber())
-                .enterAmount(100.00)
+                .enterAmount(amount)
                 .checkConfirmCheckbox()
                 .pressTransferButton()
                 .checkAlertMessageAndAccept(expectedAlert)
@@ -40,13 +45,15 @@ public class TransferMoneyTest extends BaseUITest {
                 .checkBalanceAccount(account2.getAccountNumber(), balanceReceiverAccount.getAfter());
 
         // проверка изменения баланса по API
-        balanceSenderAccount.assertThat().isDecreasedBy(100.00);
-        balanceReceiverAccount.assertThat().isIncreasedBy(100.00);
+        balanceSenderAccount.assertThat().isDecreasedBy(amount);
+        balanceReceiverAccount.assertThat().isIncreasedBy(amount);
     }
 
     @Test
     public void userCanNotTransferAmountExceedingBalanceBetweenOwnAccountsTest() {
-        //подготовка данных
+        // генерация валидного значения amount для перевода
+        double amount = RandomData.getAmount(5000.01, 10000.00);
+
         CreateUserRequestModel user = AdminSteps.createUser();
 
         authAsUser(user);
@@ -54,6 +61,7 @@ public class TransferMoneyTest extends BaseUITest {
         AccountResponseModel account1 = UserSteps.createAccount(user);
         AccountResponseModel account2 = UserSteps.createAccount(user);
 
+        double deposit = RandomData.getAmount(0.10, 5000.00);
         UserSteps.depositAccount(user.getUsername(), user.getPassword(), account1.getId(), 1000);
 
         AccountBalanceSnapshot balanceSenderAccount = AccountBalanceSnapshot.of(user.getUsername(), user.getPassword(), account1.getId());
@@ -62,7 +70,7 @@ public class TransferMoneyTest extends BaseUITest {
         //шаги теста
         new TransferPage().open().selectSenderAccount(account1.getAccountNumber())
                 .enterRecipientAccountNumber(account2.getAccountNumber())
-                .enterAmount(2000.00)
+                .enterAmount(amount)
                 .checkConfirmCheckbox()
                 .pressTransferButton()
                 .checkAlertMessageAndAccept(BankAlert.INVALID_TRANSFER_INSUFFICIENT_FUNDS_OR_INVALID_ACCOUNTS.getMessage())
@@ -76,7 +84,9 @@ public class TransferMoneyTest extends BaseUITest {
 
     @Test
     public void userCanTransferAmountWithEmptyRecipientNameBetweenOwnAccountsTest() {
-        //подготовка данных
+        // генерация валидного значения amount для перевода
+        double amount = RandomData.getAmount(0.10, 10000.00);
+
         CreateUserRequestModel user = AdminSteps.createUser();
 
         authAsUser(user);
@@ -90,10 +100,10 @@ public class TransferMoneyTest extends BaseUITest {
         AccountBalanceSnapshot balanceReceiverAccount = AccountBalanceSnapshot.of(user.getUsername(), user.getPassword(), account2.getId());
 
         //шаги теста
-        String expectedAlert = BankAlert.SUCCESSFULLY_TRANSFERRED.format(100.00, account2.getAccountNumber());
+        String expectedAlert = BankAlert.SUCCESSFULLY_TRANSFERRED.format(amount, account2.getAccountNumber());
         new TransferPage().open().selectSenderAccount(account1.getAccountNumber())
                 .enterRecipientAccountNumber(account2.getAccountNumber())
-                .enterAmount(100.00)
+                .enterAmount(amount)
                 .checkConfirmCheckbox()
                 .pressTransferButton()
                 .checkAlertMessageAndAccept(expectedAlert)
@@ -101,14 +111,14 @@ public class TransferMoneyTest extends BaseUITest {
                 .checkBalanceAccount(account2.getAccountNumber(), balanceReceiverAccount.getAfter());
 
         // проверка изменения баланса по API
-        balanceSenderAccount.assertThat().isDecreasedBy(100.00);
-        balanceReceiverAccount.assertThat().isIncreasedBy(100.00);
+        balanceSenderAccount.assertThat().isDecreasedBy(amount);
+        balanceReceiverAccount.assertThat().isIncreasedBy(amount);
     }
 
     //Негативная проверка по переводу невалидной суммы на другой аккаунт
-    @Test
-    public void userCanNotTransferInvalidAmountBetweenOwnAccountsTest() {
-        //подготовка данных
+    @ParameterizedTest
+    @ValueSource(doubles = {0.0})
+    public void userCanNotTransferInvalidAmountBetweenOwnAccountsTest(double amount) {
         CreateUserRequestModel user = AdminSteps.createUser();
 
         authAsUser(user);
@@ -124,7 +134,7 @@ public class TransferMoneyTest extends BaseUITest {
         //шаги теста
         new TransferPage().open().selectSenderAccount(account1.getAccountNumber())
                 .enterRecipientAccountNumber(account2.getAccountNumber())
-                .enterAmount(0)
+                .enterAmount(amount)
                 .checkConfirmCheckbox()
                 .pressTransferButton()
                 .checkAlertMessageAndAccept(BankAlert.TRANSFER_AMOUNT_MUST_BE_AT_LEAST_0_01.getMessage())
@@ -139,7 +149,9 @@ public class TransferMoneyTest extends BaseUITest {
     //Негативная проверка по переводу суммы c пустым отправителем
     @Test
     public void userCanNotTransferWithEmptySenderAccountTest() {
-        //подготовка данных
+        // генерация валидного значения amount для перевода
+        double amount = RandomData.getAmount(0.10, 10000.00);
+
         CreateUserRequestModel user = AdminSteps.createUser();
 
         authAsUser(user);
@@ -155,7 +167,7 @@ public class TransferMoneyTest extends BaseUITest {
         //шаги теста
         new TransferPage().open()
                 .enterRecipientAccountNumber(account2.getAccountNumber())
-                .enterAmount(50)
+                .enterAmount(amount)
                 .checkConfirmCheckbox()
                 .pressTransferButton()
                 .checkAlertMessageAndAccept(BankAlert.FILL_ALL_FIELDS_AND_CONFIRM.getMessage())
@@ -167,11 +179,12 @@ public class TransferMoneyTest extends BaseUITest {
         balanceReceiverAccount.assertThat().isUnchanged();
     }
 
-
     //Негативная проверка по переводу суммы c пустым получателем
     @Test
     public void userCanNotTransferWithEmptyRecipientAccountTest() {
-        //подготовка данных
+        // генерация валидного значения amount для перевода
+        double amount = RandomData.getAmount(0.10, 10000.00);
+
         CreateUserRequestModel user = AdminSteps.createUser();
 
         authAsUser(user);
@@ -186,7 +199,7 @@ public class TransferMoneyTest extends BaseUITest {
 
         //шаги теста
         new TransferPage().open().selectSenderAccount(account1.getAccountNumber())
-                .enterAmount(50)
+                .enterAmount(amount)
                 .checkConfirmCheckbox()
                 .pressTransferButton()
                 .checkAlertMessageAndAccept(BankAlert.FILL_ALL_FIELDS_AND_CONFIRM.getMessage())
@@ -201,7 +214,6 @@ public class TransferMoneyTest extends BaseUITest {
     //Негативная проверка по переводу с пустой суммой
     @Test
     public void userCanNotTransferWithEmptyAmountTest() {
-        //подготовка данных
         CreateUserRequestModel user = AdminSteps.createUser();
 
         authAsUser(user);
@@ -232,7 +244,9 @@ public class TransferMoneyTest extends BaseUITest {
     //Негативная проверка по переводу с неотмеченным чекбоксом
     @Test
     public void userCanNotTransferWithEmptyConfirmationCheckboxTest() {
-        //подготовка данных
+        // генерация валидного значения amount для перевода
+        double amount = RandomData.getAmount(0.10, 10000.00);
+
         CreateUserRequestModel user = AdminSteps.createUser();
 
         authAsUser(user);
@@ -249,7 +263,7 @@ public class TransferMoneyTest extends BaseUITest {
         new TransferPage().open()
                 .selectSenderAccount(account1.getAccountNumber())
                 .enterRecipientAccountNumber(account2.getAccountNumber())
-                .enterAmount(50)
+                .enterAmount(amount)
                 .pressTransferButton()
                 .checkAlertMessageAndAccept(BankAlert.FILL_ALL_FIELDS_AND_CONFIRM.getMessage())
                 .checkBalanceAccount(account1.getAccountNumber(), balanceSenderAccount.getAfter())
@@ -262,7 +276,9 @@ public class TransferMoneyTest extends BaseUITest {
 
     @Test
     public void userCanTransferValidAmountToAnotherUsersAccountTest() {
-        //подготовка данных
+        // генерация валидного значения amount для перевода
+        double amount = RandomData.getAmount(0.10, 10000.00);
+
         CreateUserRequestModel user1 = AdminSteps.createUser();
         CreateUserRequestModel user2 = AdminSteps.createUser();
 
@@ -277,11 +293,11 @@ public class TransferMoneyTest extends BaseUITest {
         AccountBalanceSnapshot balanceReceiverAccount = AccountBalanceSnapshot.of(user2.getUsername(), user2.getPassword(), account2.getId());
 
         //шаги теста
-        String expectedAlert = BankAlert.SUCCESSFULLY_TRANSFERRED.format(100.00, account2.getAccountNumber());
+        String expectedAlert = BankAlert.SUCCESSFULLY_TRANSFERRED.format(amount, account2.getAccountNumber());
         new TransferPage().open().selectSenderAccount(account1.getAccountNumber())
                 .enterRecipientName("Noname")
                 .enterRecipientAccountNumber(account2.getAccountNumber())
-                .enterAmount(100.00)
+                .enterAmount(amount)
                 .checkConfirmCheckbox()
                 .pressTransferButton()
                 .checkAlertMessageAndAccept(expectedAlert)
@@ -292,7 +308,7 @@ public class TransferMoneyTest extends BaseUITest {
         new TransferPage().open().checkBalanceAccount(account2.getAccountNumber(), balanceReceiverAccount.getAfter());
 
         // проверка изменения баланса по API
-        balanceSenderAccount.assertThat().isDecreasedBy(100.00);
-        balanceReceiverAccount.assertThat().isIncreasedBy(100.00);
+        balanceSenderAccount.assertThat().isDecreasedBy(amount);
+        balanceReceiverAccount.assertThat().isIncreasedBy(amount);
     }
 }

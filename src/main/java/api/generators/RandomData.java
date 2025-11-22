@@ -22,4 +22,9 @@ public class RandomData {
     public static String getName(){
         return RandomStringUtils.randomAlphabetic(4).toLowerCase() + " " + RandomStringUtils.randomAlphabetic(4).toLowerCase();
     }
+
+    public static double getAmount(double min, double max) {
+        double value = min + (max - min) * Math.random();
+        return Math.round(value * 100.0) / 100.0; // округляем до 2 знаков
+    }
 }
