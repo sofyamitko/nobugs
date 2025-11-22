@@ -88,6 +88,12 @@
             <scope>compile</scope>
         </dependency>
 
+        <dependency>
+            <groupId>com.codeborne</groupId>
+            <artifactId>selenide</artifactId>
+            <version>7.9.4</version>
+        </dependency>
+
     </dependencies>
 
 </project>
