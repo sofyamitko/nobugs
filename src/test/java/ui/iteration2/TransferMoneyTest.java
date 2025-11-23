@@ -62,7 +62,7 @@ public class TransferMoneyTest extends BaseUITest {
         AccountResponseModel account2 = UserSteps.createAccount(user);
 
         double deposit = RandomData.getAmount(0.10, 5000.00);
-        UserSteps.depositAccount(user.getUsername(), user.getPassword(), account1.getId(), 1000);
+        UserSteps.depositAccount(user.getUsername(), user.getPassword(), account1.getId(), deposit);
 
         AccountBalanceSnapshot balanceSenderAccount = AccountBalanceSnapshot.of(user.getUsername(), user.getPassword(), account1.getId());
         AccountBalanceSnapshot balanceReceiverAccount = AccountBalanceSnapshot.of(user.getUsername(), user.getPassword(), account2.getId());
