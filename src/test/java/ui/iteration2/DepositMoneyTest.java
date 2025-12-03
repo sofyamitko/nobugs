@@ -4,7 +4,7 @@ import api.asserts.AccountBalanceSnapshot;
 import api.generators.RandomData;
 import api.models.accounts.AccountResponseModel;
 import api.models.admin.CreateUserRequestModel;
-import common.annotations.UserSessionWithAccounts;
+import common.annotations.UserSession;
 import common.storage.SessionStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -18,7 +18,7 @@ import java.util.List;
 public class DepositMoneyTest extends BaseUITest {
 
     @Test
-    @UserSessionWithAccounts
+    @UserSession(accounts = 1)
     public void userCanIncreaseDepositTest() {
         // генерация валидного значения amount для депозита
         double amount = RandomData.getAmount(0.1, 5000);
@@ -42,7 +42,7 @@ public class DepositMoneyTest extends BaseUITest {
 
     // Проверка валидации на UI - ошибка при пополнении депозита с незаполненным аккаунтом
     @Test
-    @UserSessionWithAccounts
+    @UserSession(accounts = 1)
     public void userCanNotIncreaseDepositWithEmptyAccountTest() {
         // генерация валидного значения amount для депозита
         double amount = RandomData.getAmount(0.1, 5000);
@@ -63,7 +63,7 @@ public class DepositMoneyTest extends BaseUITest {
 
     // Проверка валидации на UI - ошибка при пополнении депозита с незаполненной суммой
     @Test
-    @UserSessionWithAccounts
+    @UserSession(accounts = 1)
     public void userCanNotIncreaseDepositWithEmptyAmountTest() {
         CreateUserRequestModel user = SessionStorage.getUser();
 
@@ -83,7 +83,7 @@ public class DepositMoneyTest extends BaseUITest {
     // Проверка валидации c API (интеграция) - ошибка при пополнении депозита с невалидной суммой
     @ParameterizedTest
     @ValueSource(doubles = {5000.01})
-    @UserSessionWithAccounts
+    @UserSession(accounts = 1)
     public void userCanNotIncreaseDepositWithInvalidAmountTest(double amount) {
         CreateUserRequestModel user = SessionStorage.getUser();
 
