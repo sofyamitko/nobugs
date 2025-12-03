@@ -3,10 +3,10 @@ package ui.iteration2;
 import api.asserts.ProfileSnapshot;
 import api.generators.RandomData;
 import api.models.admin.CreateUserRequestModel;
-import api.requests.steps.AdminSteps;
+import common.annotations.UserSession;
+import common.storage.SessionStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import ui.iteration1.BaseUITest;
 import ui.pages.BankAlert;
@@ -15,12 +15,11 @@ import ui.pages.EditProfilePage;
 public class UpdateUserProfileTest extends BaseUITest {
 
     @Test
+    @UserSession
     public void userCanUpdateUserProfileTest() {
         String name = RandomData.getName();
 
-        CreateUserRequestModel user = AdminSteps.createUser();
-
-        authAsUser(user);
+        CreateUserRequestModel user = SessionStorage.getUser();
 
         // сохранение текущего состояния name до изменения
         ProfileSnapshot snapshot = ProfileSnapshot.of(user.getUsername(), user.getPassword());
@@ -38,10 +37,9 @@ public class UpdateUserProfileTest extends BaseUITest {
     // Проверка валидации в связке с API - ошибка при изменении профиля с невалидным именем
     @ParameterizedTest
     @ValueSource(strings = {"Kata   Katya Kat"})
+    @UserSession
     public void userCanNotUpdateUserProfileWithInvalidNameTest(String name) {
-        CreateUserRequestModel user = AdminSteps.createUser();
-
-        authAsUser(user);
+        CreateUserRequestModel user = SessionStorage.getUser();
 
         // сохранение текущего состояния name до изменения
         ProfileSnapshot snapshot = ProfileSnapshot.of(user.getUsername(), user.getPassword());
@@ -58,10 +56,9 @@ public class UpdateUserProfileTest extends BaseUITest {
 
     // Проверка валидации на UI - ошибка при изменении профиля с пустым именем
     @Test
+    @UserSession
     public void userCanNotUpdateUserProfileWithEmptyNameTest() {
-        CreateUserRequestModel user = AdminSteps.createUser();
-
-        authAsUser(user);
+        CreateUserRequestModel user = SessionStorage.getUser();
 
         // сохранение текущего состояния name до изменения
         ProfileSnapshot snapshot = ProfileSnapshot.of(user.getUsername(), user.getPassword());

@@ -4,8 +4,9 @@ import api.asserts.AccountBalanceSnapshot;
 import api.generators.RandomData;
 import api.models.accounts.AccountResponseModel;
 import api.models.admin.CreateUserRequestModel;
-import api.requests.steps.AdminSteps;
 import api.requests.steps.UserSteps;
+import common.annotations.UserSessionWithAccounts;
+import common.storage.SessionStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -16,16 +17,14 @@ import ui.pages.TransferPage;
 public class TransferMoneyTest extends BaseUITest {
 
     @Test
+    @UserSessionWithAccounts(accounts = 2)
     public void userCanTransferAmountBetweenOwnAccountsTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(0.10, 10000.00);
 
-        CreateUserRequestModel user = AdminSteps.createUser();
-
-        authAsUser(user);
-
-        AccountResponseModel account1 = UserSteps.createAccount(user);
-        AccountResponseModel account2 = UserSteps.createAccount(user);
+        CreateUserRequestModel user = SessionStorage.getUser();
+        AccountResponseModel account1 = SessionStorage.getSteps().getAllAccounts().getFirst();
+        AccountResponseModel account2 = SessionStorage.getSteps().getAllAccounts().getLast();
 
         UserSteps.depositAccount(user.getUsername(), user.getPassword(), account1.getId(), 15000);
 
@@ -50,16 +49,14 @@ public class TransferMoneyTest extends BaseUITest {
     }
 
     @Test
+    @UserSessionWithAccounts(accounts = 2)
     public void userCanNotTransferAmountExceedingBalanceBetweenOwnAccountsTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(5000.01, 10000.00);
 
-        CreateUserRequestModel user = AdminSteps.createUser();
-
-        authAsUser(user);
-
-        AccountResponseModel account1 = UserSteps.createAccount(user);
-        AccountResponseModel account2 = UserSteps.createAccount(user);
+        CreateUserRequestModel user = SessionStorage.getUser();
+        AccountResponseModel account1 = SessionStorage.getSteps().getAllAccounts().getFirst();
+        AccountResponseModel account2 = SessionStorage.getSteps().getAllAccounts().getLast();
 
         double deposit = RandomData.getAmount(0.10, 5000.00);
         UserSteps.depositAccount(user.getUsername(), user.getPassword(), account1.getId(), deposit);
@@ -83,16 +80,14 @@ public class TransferMoneyTest extends BaseUITest {
     }
 
     @Test
+    @UserSessionWithAccounts(accounts = 2)
     public void userCanTransferAmountWithEmptyRecipientNameBetweenOwnAccountsTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(0.10, 10000.00);
 
-        CreateUserRequestModel user = AdminSteps.createUser();
-
-        authAsUser(user);
-
-        AccountResponseModel account1 = UserSteps.createAccount(user);
-        AccountResponseModel account2 = UserSteps.createAccount(user);
+        CreateUserRequestModel user = SessionStorage.getUser();
+        AccountResponseModel account1 = SessionStorage.getSteps().getAllAccounts().getFirst();
+        AccountResponseModel account2 = SessionStorage.getSteps().getAllAccounts().getLast();
 
         UserSteps.depositAccount(user.getUsername(), user.getPassword(), account1.getId(), 15000);
 
@@ -118,13 +113,11 @@ public class TransferMoneyTest extends BaseUITest {
     //Негативная проверка по переводу невалидной суммы на другой аккаунт
     @ParameterizedTest
     @ValueSource(doubles = {0.0})
+    @UserSessionWithAccounts(accounts = 2)
     public void userCanNotTransferInvalidAmountBetweenOwnAccountsTest(double amount) {
-        CreateUserRequestModel user = AdminSteps.createUser();
-
-        authAsUser(user);
-
-        AccountResponseModel account1 = UserSteps.createAccount(user);
-        AccountResponseModel account2 = UserSteps.createAccount(user);
+        CreateUserRequestModel user = SessionStorage.getUser();
+        AccountResponseModel account1 = SessionStorage.getSteps().getAllAccounts().getFirst();
+        AccountResponseModel account2 = SessionStorage.getSteps().getAllAccounts().getLast();
 
         UserSteps.depositAccount(user.getUsername(), user.getPassword(), account1.getId(), 15000);
 
@@ -148,16 +141,14 @@ public class TransferMoneyTest extends BaseUITest {
 
     //Негативная проверка по переводу суммы c пустым отправителем
     @Test
+    @UserSessionWithAccounts(accounts = 2)
     public void userCanNotTransferWithEmptySenderAccountTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(0.10, 10000.00);
 
-        CreateUserRequestModel user = AdminSteps.createUser();
-
-        authAsUser(user);
-
-        AccountResponseModel account1 = UserSteps.createAccount(user);
-        AccountResponseModel account2 = UserSteps.createAccount(user);
+        CreateUserRequestModel user = SessionStorage.getUser();
+        AccountResponseModel account1 = SessionStorage.getSteps().getAllAccounts().getFirst();
+        AccountResponseModel account2 = SessionStorage.getSteps().getAllAccounts().getLast();
 
         UserSteps.depositAccount(user.getUsername(), user.getPassword(), account1.getId(), 15000);
 
@@ -181,16 +172,15 @@ public class TransferMoneyTest extends BaseUITest {
 
     //Негативная проверка по переводу суммы c пустым получателем
     @Test
+    @UserSessionWithAccounts(accounts = 2)
     public void userCanNotTransferWithEmptyRecipientAccountTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(0.10, 10000.00);
 
-        CreateUserRequestModel user = AdminSteps.createUser();
+        CreateUserRequestModel user = SessionStorage.getUser();
 
-        authAsUser(user);
-
-        AccountResponseModel account1 = UserSteps.createAccount(user);
-        AccountResponseModel account2 = UserSteps.createAccount(user);
+        AccountResponseModel account1 = SessionStorage.getSteps().getAllAccounts().getFirst();
+        AccountResponseModel account2 = SessionStorage.getSteps().getAllAccounts().getLast();
 
         UserSteps.depositAccount(user.getUsername(), user.getPassword(), account1.getId(), 15000);
 
@@ -213,13 +203,12 @@ public class TransferMoneyTest extends BaseUITest {
 
     //Негативная проверка по переводу с пустой суммой
     @Test
+    @UserSessionWithAccounts(accounts = 2)
     public void userCanNotTransferWithEmptyAmountTest() {
-        CreateUserRequestModel user = AdminSteps.createUser();
+        CreateUserRequestModel user = SessionStorage.getUser();
 
-        authAsUser(user);
-
-        AccountResponseModel account1 = UserSteps.createAccount(user);
-        AccountResponseModel account2 = UserSteps.createAccount(user);
+        AccountResponseModel account1 = SessionStorage.getSteps().getAllAccounts().getFirst();
+        AccountResponseModel account2 = SessionStorage.getSteps().getAllAccounts().getLast();
 
         UserSteps.depositAccount(user.getUsername(), user.getPassword(), account1.getId(), 15000);
 
@@ -243,16 +232,14 @@ public class TransferMoneyTest extends BaseUITest {
 
     //Негативная проверка по переводу с неотмеченным чекбоксом
     @Test
+    @UserSessionWithAccounts(accounts = 2)
     public void userCanNotTransferWithEmptyConfirmationCheckboxTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(0.10, 10000.00);
+        CreateUserRequestModel user = SessionStorage.getUser();
 
-        CreateUserRequestModel user = AdminSteps.createUser();
-
-        authAsUser(user);
-
-        AccountResponseModel account1 = UserSteps.createAccount(user);
-        AccountResponseModel account2 = UserSteps.createAccount(user);
+        AccountResponseModel account1 =  SessionStorage.getSteps().getAllAccounts().getFirst();
+        AccountResponseModel account2 =  SessionStorage.getSteps().getAllAccounts().getLast();
 
         UserSteps.depositAccount(user.getUsername(), user.getPassword(), account1.getId(), 15000);
 
@@ -275,17 +262,16 @@ public class TransferMoneyTest extends BaseUITest {
     }
 
     @Test
+    @UserSessionWithAccounts(value = 2)
     public void userCanTransferValidAmountToAnotherUsersAccountTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(0.10, 10000.00);
 
-        CreateUserRequestModel user1 = AdminSteps.createUser();
-        CreateUserRequestModel user2 = AdminSteps.createUser();
+        CreateUserRequestModel user1 = SessionStorage.getUser(1);
+        CreateUserRequestModel user2 = SessionStorage.getUser(2);
 
-        authAsUser(user1);
-
-        AccountResponseModel account1 = UserSteps.createAccount(user1);
-        AccountResponseModel account2 = UserSteps.createAccount(user2);
+        AccountResponseModel account1 = SessionStorage.getSteps(1).getAllAccounts().getFirst();
+        AccountResponseModel account2 =  SessionStorage.getSteps(2).getAllAccounts().getFirst();
 
         UserSteps.depositAccount(user1.getUsername(), user1.getPassword(), account1.getId(), 15000);
 
