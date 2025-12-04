@@ -5,7 +5,7 @@ import api.generators.RandomData;
 import api.models.accounts.AccountResponseModel;
 import api.models.admin.CreateUserRequestModel;
 import api.requests.steps.UserSteps;
-import common.annotations.UserSessionWithAccounts;
+import common.annotations.UserSession;
 import common.storage.SessionStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -17,7 +17,7 @@ import ui.pages.TransferPage;
 public class TransferMoneyTest extends BaseUITest {
 
     @Test
-    @UserSessionWithAccounts(accounts = 2)
+    @UserSession(accounts = 2)
     public void userCanTransferAmountBetweenOwnAccountsTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(0.10, 10000.00);
@@ -49,7 +49,7 @@ public class TransferMoneyTest extends BaseUITest {
     }
 
     @Test
-    @UserSessionWithAccounts(accounts = 2)
+    @UserSession(accounts = 2)
     public void userCanNotTransferAmountExceedingBalanceBetweenOwnAccountsTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(5000.01, 10000.00);
@@ -80,7 +80,7 @@ public class TransferMoneyTest extends BaseUITest {
     }
 
     @Test
-    @UserSessionWithAccounts(accounts = 2)
+    @UserSession(accounts = 2)
     public void userCanTransferAmountWithEmptyRecipientNameBetweenOwnAccountsTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(0.10, 10000.00);
@@ -113,7 +113,7 @@ public class TransferMoneyTest extends BaseUITest {
     //Негативная проверка по переводу невалидной суммы на другой аккаунт
     @ParameterizedTest
     @ValueSource(doubles = {0.0})
-    @UserSessionWithAccounts(accounts = 2)
+    @UserSession(accounts = 2)
     public void userCanNotTransferInvalidAmountBetweenOwnAccountsTest(double amount) {
         CreateUserRequestModel user = SessionStorage.getUser();
         AccountResponseModel account1 = SessionStorage.getSteps().getAllAccounts().getFirst();
@@ -141,7 +141,7 @@ public class TransferMoneyTest extends BaseUITest {
 
     //Негативная проверка по переводу суммы c пустым отправителем
     @Test
-    @UserSessionWithAccounts(accounts = 2)
+    @UserSession(accounts = 2)
     public void userCanNotTransferWithEmptySenderAccountTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(0.10, 10000.00);
@@ -172,7 +172,7 @@ public class TransferMoneyTest extends BaseUITest {
 
     //Негативная проверка по переводу суммы c пустым получателем
     @Test
-    @UserSessionWithAccounts(accounts = 2)
+    @UserSession(accounts = 2)
     public void userCanNotTransferWithEmptyRecipientAccountTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(0.10, 10000.00);
@@ -203,7 +203,7 @@ public class TransferMoneyTest extends BaseUITest {
 
     //Негативная проверка по переводу с пустой суммой
     @Test
-    @UserSessionWithAccounts(accounts = 2)
+    @UserSession(accounts = 2)
     public void userCanNotTransferWithEmptyAmountTest() {
         CreateUserRequestModel user = SessionStorage.getUser();
 
@@ -232,7 +232,7 @@ public class TransferMoneyTest extends BaseUITest {
 
     //Негативная проверка по переводу с неотмеченным чекбоксом
     @Test
-    @UserSessionWithAccounts(accounts = 2)
+    @UserSession(accounts = 2)
     public void userCanNotTransferWithEmptyConfirmationCheckboxTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(0.10, 10000.00);
@@ -262,7 +262,7 @@ public class TransferMoneyTest extends BaseUITest {
     }
 
     @Test
-    @UserSessionWithAccounts(value = 2)
+    @UserSession(value = 2, accounts = 2)
     public void userCanTransferValidAmountToAnotherUsersAccountTest() {
         // генерация валидного значения amount для перевода
         double amount = RandomData.getAmount(0.10, 10000.00);
