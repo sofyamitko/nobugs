@@ -1,0 +1,45 @@
+package common.extensions;
+
+import api.models.admin.CreateUserRequestModel;
+import api.requests.steps.AdminSteps;
+import api.requests.steps.UserSteps;
+import common.annotations.UserSession;
+import common.storage.SessionStorage;
+import org.junit.jupiter.api.extension.BeforeEachCallback;
+import org.junit.jupiter.api.extension.ExtensionContext;
+import ui.pages.BasePage;
+
+import java.util.LinkedList;
+import java.util.List;
+
+public class UserSessionExtension implements BeforeEachCallback {
+    @Override
+    public void beforeEach(ExtensionContext context) throws Exception {
+        // шаг 1 = проверить, что есть аннотация UserSession
+        UserSession annotation = context.getRequiredTestMethod().getAnnotation(UserSession.class);
+        if (annotation != null) {
+            int userCount = annotation.value();
+
+            int accounts = annotation.accounts();
+
+            SessionStorage.clear();
+
+            List<CreateUserRequestModel> users = new LinkedList<>();
+            for (int i = 0; i < userCount; i++) {
+                CreateUserRequestModel user = AdminSteps.createUser();
+                users.add(user);
+
+                if(accounts > 0) {
+                    for(int j = 1; j <= accounts; j++) {
+                        UserSteps.createAccount(user);
+                    }
+                }
+            }
+            SessionStorage.addUsers(users);
+
+            int authAsUser = annotation.auth();
+
+            BasePage.authAsUser(SessionStorage.getUser(authAsUser));
+        }
+    }
+}

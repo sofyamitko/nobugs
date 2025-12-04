@@ -4,8 +4,8 @@ import api.asserts.AccountBalanceSnapshot;
 import api.generators.RandomData;
 import api.models.accounts.AccountResponseModel;
 import api.models.admin.CreateUserRequestModel;
-import api.requests.steps.AdminSteps;
-import api.requests.steps.UserSteps;
+import common.annotations.UserSession;
+import common.storage.SessionStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -13,18 +13,20 @@ import ui.iteration1.BaseUITest;
 import ui.pages.BankAlert;
 import ui.pages.DepositPage;
 
+import java.util.List;
+
 public class DepositMoneyTest extends BaseUITest {
 
     @Test
+    @UserSession(accounts = 1)
     public void userCanIncreaseDepositTest() {
         // генерация валидного значения amount для депозита
         double amount = RandomData.getAmount(0.1, 5000);
 
-        CreateUserRequestModel user = AdminSteps.createUser();
+        CreateUserRequestModel user = SessionStorage.getUser();
 
-        authAsUser(user.getUsername(), user.getPassword());
-
-        AccountResponseModel account = UserSteps.createAccount(user);
+        List<AccountResponseModel> accounts = SessionStorage.getSteps().getAllAccounts();
+        AccountResponseModel account = accounts.getFirst();
 
         // создание снэпшота текущего состояния баланса (до выполнения депозита)
         AccountBalanceSnapshot balance = AccountBalanceSnapshot.of(user.getUsername(), user.getPassword(), account.getId());
@@ -40,15 +42,15 @@ public class DepositMoneyTest extends BaseUITest {
 
     // Проверка валидации на UI - ошибка при пополнении депозита с незаполненным аккаунтом
     @Test
+    @UserSession(accounts = 1)
     public void userCanNotIncreaseDepositWithEmptyAccountTest() {
         // генерация валидного значения amount для депозита
         double amount = RandomData.getAmount(0.1, 5000);
 
-        CreateUserRequestModel user = AdminSteps.createUser();
+        CreateUserRequestModel user = SessionStorage.getUser();
 
-        authAsUser(user.getUsername(), user.getPassword());
-
-        AccountResponseModel account = UserSteps.createAccount(user);
+        List<AccountResponseModel> accounts = SessionStorage.getSteps().getAllAccounts();
+        AccountResponseModel account = accounts.getFirst();
 
         // создание снэпшота текущего состояния баланса (до выполнения депозита)
         AccountBalanceSnapshot balance = AccountBalanceSnapshot.of(user.getUsername(), user.getPassword(), account.getId());
@@ -61,12 +63,12 @@ public class DepositMoneyTest extends BaseUITest {
 
     // Проверка валидации на UI - ошибка при пополнении депозита с незаполненной суммой
     @Test
+    @UserSession(accounts = 1)
     public void userCanNotIncreaseDepositWithEmptyAmountTest() {
-        CreateUserRequestModel user = AdminSteps.createUser();
+        CreateUserRequestModel user = SessionStorage.getUser();
 
-        authAsUser(user.getUsername(), user.getPassword());
-
-        AccountResponseModel account = UserSteps.createAccount(user);
+        List<AccountResponseModel> accounts = SessionStorage.getSteps().getAllAccounts();
+        AccountResponseModel account = accounts.getFirst();
 
         // создание снэпшота текущего состояния баланса (до выполнения депозита)
         AccountBalanceSnapshot balance = AccountBalanceSnapshot.of(user.getUsername(), user.getPassword(), account.getId());
@@ -81,13 +83,12 @@ public class DepositMoneyTest extends BaseUITest {
     // Проверка валидации c API (интеграция) - ошибка при пополнении депозита с невалидной суммой
     @ParameterizedTest
     @ValueSource(doubles = {5000.01})
+    @UserSession(accounts = 1)
     public void userCanNotIncreaseDepositWithInvalidAmountTest(double amount) {
+        CreateUserRequestModel user = SessionStorage.getUser();
 
-        CreateUserRequestModel user = AdminSteps.createUser();
-
-        authAsUser(user.getUsername(), user.getPassword());
-
-        AccountResponseModel account = UserSteps.createAccount(user);
+        List<AccountResponseModel> accounts = SessionStorage.getSteps().getAllAccounts();
+        AccountResponseModel account = accounts.getFirst();
 
         // создание снэпшота текущего состояния баланса (до выполнения депозита)
         AccountBalanceSnapshot balance = AccountBalanceSnapshot.of(user.getUsername(), user.getPassword(), account.getId());
